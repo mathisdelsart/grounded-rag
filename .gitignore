@@ -1,0 +1,20 @@
+# Secrets & personal data
+.env
+data/
+*.db
+*.local.md
+
+# Qdrant (local storage)
+qdrant_storage/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

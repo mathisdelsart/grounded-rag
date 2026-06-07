@@ -1,0 +1,51 @@
+[project]
+name = "grounded-rag"
+version = "0.1.0"
+description = "A grounded RAG-LLM that answers strictly from your own documents, with citations and a faithfulness guard."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=0.3",
+    "langchain-openai>=0.2",
+    "pydantic-settings>=2.5",
+    "qdrant-client>=1.12",
+]
+
+# Installed per phase, e.g. `uv sync --extra ingestion`
+[project.optional-dependencies]
+ingestion = [
+    "pymupdf>=1.24",
+    "marker-pdf>=1.0",
+    "sentence-transformers>=3.0",
+]
+agent = [
+    "langgraph>=0.2",
+]
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+]
+obs = [
+    "langfuse>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.7",
+    "pytest>=8.0",
+]
+
+# Application, not a library: uv manages the venv + lock without building the project.
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
