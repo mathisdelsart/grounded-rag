@@ -7,8 +7,13 @@ driven by environment variables, so models can be swapped without code changes.
 import os
 from functools import lru_cache
 
+from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load `.env` into the process environment so provider SDKs (e.g. OpenAI) can
+# read OPENAI_API_KEY directly. pydantic-settings only populates Settings fields.
+load_dotenv()
 
 
 class Settings(BaseSettings):
