@@ -16,7 +16,9 @@ Two optimizations keep ingestion fast and cheap:
 """
 
 import base64
+import logging
 import re
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -25,6 +27,8 @@ from langchain_core.messages import HumanMessage
 
 from config import get_llm
 from ingestion.schema import Page
+
+logger = logging.getLogger(__name__)
 
 _PROMPT = (
     "You transcribe a single course slide into clean Markdown for a study tutor.\n"
@@ -149,6 +153,70 @@ def _vision_transcribe(image_uri: str, llm) -> str:
 # so tests can pass a stub that returns canned text instead of calling the model.
 Transcriber = Callable[[str], str]
 
+# A sleeper pauses execution for the given number of seconds. Injected so tests
+# run instantly with a no-op instead of waiting on real backoff delays.
+Sleeper = Callable[[float], None]
+
+# Default backoff schedule for rate-limit retries. The provider enforces a
+# per-minute token budget, so waits are on the order of tens of seconds.
+_DEFAULT_MAX_RETRIES = 6
+_DEFAULT_BASE_DELAY = 2.0
+_DEFAULT_MAX_DELAY = 60.0
+
+
+def is_rate_limit_error(exc: BaseException) -> bool:
+    """Return whether `exc` looks like an API rate-limit (HTTP 429) error.
+
+    Detection is by exception class name and message so the OpenAI SDK never has
+    to be imported here: any error whose type name or text mentions a 429 status
+    or a rate limit is treated as transient and worth retrying. Unrelated errors
+    return False and must be re-raised immediately so real bugs are not masked.
+    """
+    haystack = f"{type(exc).__name__} {exc}".lower()
+    return "ratelimit" in haystack or "rate limit" in haystack or "429" in haystack
+
+
+def with_rate_limit_retry(
+    transcriber: Transcriber,
+    *,
+    max_retries: int = _DEFAULT_MAX_RETRIES,
+    base_delay: float = _DEFAULT_BASE_DELAY,
+    max_delay: float = _DEFAULT_MAX_DELAY,
+    sleep: Sleeper = time.sleep,
+) -> Transcriber:
+    """Wrap a transcriber so rate-limit failures retry with exponential backoff.
+
+    Only rate-limit (HTTP 429) errors are retried; any other exception is
+    re-raised immediately so genuine bugs surface instead of being silently
+    retried. Between attempts the wrapper sleeps `base_delay * 2**attempt`,
+    capped at `max_delay`. The sleep function is injectable so tests can pass a
+    no-op and run without any real waiting. After `max_retries` exhausted
+    retries the last rate-limit error propagates.
+    """
+
+    def wrapped(image_uri: str) -> str:
+        attempt = 0
+        while True:
+            try:
+                return transcriber(image_uri)
+            except Exception as exc:  # noqa: BLE001 - re-raised below unless 429
+                if not is_rate_limit_error(exc):
+                    raise
+                if attempt >= max_retries:
+                    logger.warning("rate limit: giving up after %d retries", attempt)
+                    raise
+                delay = min(base_delay * (2**attempt), max_delay)
+                logger.warning(
+                    "rate limit hit; backing off %.1fs before retry %d/%d",
+                    delay,
+                    attempt + 1,
+                    max_retries,
+                )
+                sleep(delay)
+                attempt += 1
+
+    return wrapped
+
 
 def extract_pdf(
     path: str,
@@ -158,8 +226,9 @@ def extract_pdf(
     max_pages: int | None = None,
     pages: list[int] | None = None,
     hybrid: bool = False,
-    concurrency: int = 8,
+    concurrency: int = 4,
     transcriber: Transcriber | None = None,
+    sleep: Sleeper = time.sleep,
 ) -> list[Page]:
     """Extract a slide-deck PDF into per-slide Pages.
 
@@ -181,7 +250,10 @@ def extract_pdf(
         concurrency: Maximum number of vision transcriptions running at once.
         transcriber: Optional injected function mapping a rasterized page (PNG
             data URI) to its Markdown text. Defaults to the vision model; tests
-            pass a stub to avoid any API call.
+            pass a stub to avoid any API call. The transcriber (default or
+            injected) is wrapped with rate-limit retry/backoff.
+        sleep: Sleep function used by the rate-limit backoff; tests pass a no-op
+            so retries do not actually wait.
 
     Returns:
         One Page per selected slide, in document order, with math preserved as
@@ -194,6 +266,9 @@ def extract_pdf(
 
         def transcriber(image_uri: str) -> str:
             return _vision_transcribe(image_uri, llm)
+
+    # Back off and retry on rate-limit (429) errors instead of crashing the run.
+    transcriber = with_rate_limit_retry(transcriber, sleep=sleep)
 
     doc = fitz.open(path)
     selected = set(pages) if pages else None
