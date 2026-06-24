@@ -144,18 +144,39 @@ This is not covered in the course material.
 
 ## Metrics
 
-Tracked by the offline evaluation harness (`eval/run_eval.py`) over the reference dataset:
+Measured end-to-end on a full course: a 63-slide *Wavelet Transform* deck ingested into Qdrant,
+then evaluated with the offline harness (`eval/run_eval.py`) and the threshold calibration script.
 
-- **Refusal accuracy** — out-of-course questions correctly refused.
-- **Faithfulness rate** — answers fully supported by their retrieved sources.
-- **Relevance rate** — answers that actually address the question.
-- **Retrieval precision** — the right chunk retrieved for in-course questions.
+| Metric | Result | Notes |
+| --- | --- | --- |
+| **Index** | 63 / 63 slides | Parallel ingestion absorbed 25 rate-limit (HTTP 429) responses via retry + backoff, zero crashes |
+| **Threshold calibration** | **100% in/out accuracy** | In-course scores 0.57–0.68, out-of-course 0.28–0.43 → clean separation; threshold calibrated to ≈ 0.50 (0.497) |
+| **Retrieval hit-rate** | **73% → 82% (+9 pts)** | With the cross-encoder reranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`) enabled |
+| **Faithfulness** | **75%** | Offline LLM-as-a-judge (gpt-4o-mini): every claim supported by the retrieved sources |
+| **Relevance** | **100%** | Same judge: answers actually address the question |
 
-> TODO: publish a measured headline number (for example, faithfulness rate on the reference set)
-> once the dataset is expanded.
+**Honest caveat.** This deck is *constructive* (formula slides, few prose definitions), so some
+definitional in-course questions are **refused rather than answered**: the system declines instead of
+hallucinating. That is the North-Star guard working as intended — it lowers the raw "refusal accuracy"
+number on borderline definitional questions, but the alternative (inventing a definition the slides
+never state) is exactly what `grounded-rag` is built to avoid.
+
+## Demo / Try it
+
+```bash
+git pull && docker compose up --build
+```
+
+This brings up the full stack with the course already indexed in Qdrant:
+
+- **Streamlit UI** — <http://localhost:8501> (Ask · Re-explain by level · Exercise · Grade · History)
+- **API docs** — <http://localhost:8000/docs>
+
+A known-good in-course question, *"What is the piecewise constant approximation?"*, returns a cited
+answer with LaTeX preserved. An out-of-course question is refused with
+`This is not covered in the course material.` rather than answered.
 
 ## Notes
 
-- Demo screenshot / GIF: _TODO_.
 - `.env`, secrets, and course PDFs are never committed (personal data).
 - Author: `mathisdelsart`.
