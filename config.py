@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from obs import get_callbacks
+
 # Load `.env` into the process environment so provider SDKs (e.g. OpenAI) can
 # read OPENAI_API_KEY directly. pydantic-settings only populates Settings fields.
 load_dotenv()
@@ -46,4 +48,12 @@ def get_llm(role: str = "default"):
     Defaults to `gpt-4o-mini`. Uses `temperature=0` for reproducibility.
     """
     model = os.getenv(f"LLM_{role.upper()}", "gpt-4o-mini")
-    return init_chat_model(model, temperature=0)
+    llm = init_chat_model(model, temperature=0)
+
+    # Attach LangFuse tracing only when explicitly enabled via environment.
+    # When disabled, `get_callbacks()` is an empty list and the model is
+    # returned unchanged (no langfuse import, no behavior change).
+    callbacks = get_callbacks()
+    if callbacks:
+        llm = llm.with_config(callbacks=callbacks)
+    return llm
