@@ -1,7 +1,9 @@
 # Serving image for the FastAPI app and the Streamlit UI.
 # Builds with uv against the pinned uv.lock and installs the extras needed to
-# serve the API and the UI (api + agent + ui). The heavy `ingestion` extra
-# (torch, marker-pdf) is intentionally excluded to keep the image small.
+# serve the API and the UI (api + agent + ui + embed). The query-side embedding
+# model (bge-m3) is baked into the image so the first request is instant and
+# needs no network. The heavy offline-only `ingestion` extra (marker-pdf, etc.)
+# stays out.
 
 FROM python:3.12-slim
 
@@ -11,6 +13,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/app/.venv \
+    HF_HOME=/app/.hf_cache \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
@@ -18,7 +21,11 @@ WORKDIR /app
 # Install dependencies first for better layer caching. Only the lockfile and
 # project metadata are needed to resolve and sync the environment.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --extra api --extra agent --extra ui
+RUN uv sync --frozen --no-install-project --extra api --extra agent --extra ui --extra embed
+
+# Pre-download the multilingual embedding model into the image's HF cache so the
+# first query embeds instantly and the container needs no network for retrieval.
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"
 
 # Copy the application source needed at runtime. Root modules are copied with a
 # glob so newly added top-level modules are picked up automatically; the named
