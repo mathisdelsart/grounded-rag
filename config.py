@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     # positive value stops generation once accumulated usage exceeds the cap.
     llm_budget_tokens: int = 0
 
+    # API-key authentication (opt-in). "" leaves the API fully open; a non-empty
+    # value requires clients to send a matching `X-API-Key` header on the
+    # mutating endpoints and `/history`. `/health` is always open.
+    api_key: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
