@@ -16,8 +16,15 @@ from ingestion.extract import (
     PageFeatures,
     _strip_code_fence,
     has_math_symbols,
+    is_rate_limit_error,
     needs_vision,
+    with_rate_limit_retry,
 )
+
+
+class _FakeRateLimitError(Exception):
+    """Stand-in for the OpenAI SDK's RateLimitError, by class name only."""
+
 
 # --- _strip_code_fence: pure helper ------------------------------------------
 
@@ -256,3 +263,104 @@ def test_explicit_pages_override_order(fake_fitz):
     fake_fitz(pages)
     result = extract.extract_pdf("x.pdf", "Course", pages=[2, 4], transcriber=lambda uri: "V")
     assert [p.page for p in result] == [2, 4]
+
+
+# --- Rate-limit detection helper ---------------------------------------------
+
+
+def test_is_rate_limit_error_recognizes_429_and_rate_limit_messages():
+    assert is_rate_limit_error(_FakeRateLimitError("boom"))  # matched by class name
+    assert is_rate_limit_error(Exception("Error code: 429 - too many tokens"))
+    assert is_rate_limit_error(Exception("Rate limit reached for org"))
+    assert is_rate_limit_error(RuntimeError("RATELIMIT exceeded"))
+
+
+def test_is_rate_limit_error_rejects_unrelated_errors():
+    assert not is_rate_limit_error(ValueError("bad argument"))
+    assert not is_rate_limit_error(KeyError("missing"))
+    assert not is_rate_limit_error(Exception("connection refused"))
+
+
+# --- Retry wrapper: backoff on 429, immediate re-raise otherwise -------------
+
+
+def test_with_rate_limit_retry_retries_then_succeeds():
+    calls = {"n": 0}
+    slept: list[float] = []
+
+    def flaky(_uri: str) -> str:
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise _FakeRateLimitError("429 too many requests")
+        return "OK"
+
+    wrapped = with_rate_limit_retry(flaky, sleep=slept.append)
+    assert wrapped("uri") == "OK"
+    assert calls["n"] == 3  # two failures + one success
+    assert len(slept) == 2  # one backoff per retry
+    assert slept[0] < slept[1]  # exponential growth
+
+
+def test_with_rate_limit_retry_reraises_non_rate_limit_immediately():
+    calls = {"n": 0}
+
+    def boom(_uri: str) -> str:
+        calls["n"] += 1
+        raise ValueError("genuine application bug")
+
+    wrapped = with_rate_limit_retry(boom, sleep=lambda _s: None)
+    with pytest.raises(ValueError, match="genuine application bug"):
+        wrapped("uri")
+    assert calls["n"] == 1  # no retry on non-rate-limit errors
+
+
+def test_with_rate_limit_retry_gives_up_after_max_retries():
+    calls = {"n": 0}
+
+    def always_429(_uri: str) -> str:
+        calls["n"] += 1
+        raise _FakeRateLimitError("rate limit")
+
+    wrapped = with_rate_limit_retry(always_429, max_retries=3, sleep=lambda _s: None)
+    with pytest.raises(_FakeRateLimitError):
+        wrapped("uri")
+    assert calls["n"] == 4  # initial attempt + 3 retries
+
+
+# --- extract_pdf integrates the retry wrapper --------------------------------
+
+
+def test_extract_pdf_retries_rate_limited_page(fake_fitz):
+    # Distinct text per page so each rasterizes to a distinct data URI.
+    pages = [_FakePage(f"page-{i} E = mc^2", images=1) for i in range(2)]
+    fake_fitz(pages)
+
+    attempts: dict[str, int] = {}
+    slept: list[float] = []
+
+    def stub(uri: str) -> str:
+        attempts[uri] = attempts.get(uri, 0) + 1
+        if attempts[uri] == 1:
+            raise _FakeRateLimitError("429 rate limit, retry")
+        return "VISION"
+
+    result = extract.extract_pdf(
+        "x.pdf", "Course", concurrency=2, transcriber=stub, sleep=slept.append
+    )
+
+    assert [p.page for p in result] == [1, 2]
+    assert all(p.text == "VISION" for p in result)
+    # Each page failed once then succeeded -> two attempts per unique page.
+    assert all(c == 2 for c in attempts.values())
+    assert len(slept) == 2  # one backoff per page (no real waiting occurred)
+
+
+def test_extract_pdf_propagates_non_rate_limit_error(fake_fitz):
+    pages = [_FakePage("E = mc^2", images=1)]
+    fake_fitz(pages)
+
+    def stub(_uri: str) -> str:
+        raise ValueError("genuine application bug")
+
+    with pytest.raises(ValueError, match="genuine application bug"):
+        extract.extract_pdf("x.pdf", "Course", transcriber=stub, sleep=lambda _s: None)

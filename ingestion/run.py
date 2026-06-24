@@ -2,6 +2,11 @@
 
 Usage:
     python -m ingestion.run path/to/course.pdf --course "Wavelet Transform"
+
+Pages are processed in batches (extract -> chunk -> index per batch) so a crash
+mid-run keeps the progress of earlier batches instead of losing everything. Chunk
+ids are stable UUIDs, so re-running is idempotent: an interrupted run can simply
+be re-run and already-indexed pages are overwritten cleanly.
 """
 
 import argparse
@@ -10,6 +15,44 @@ import logging
 from ingestion.chunk import chunk_pages
 from ingestion.extract import extract_pdf
 from ingestion.index import index_chunks
+
+logger = logging.getLogger(__name__)
+
+
+def _pdf_page_count(path: str) -> int:
+    """Return the number of pages in a PDF (imported lazily, like extract_pdf)."""
+    import fitz  # PyMuPDF, imported lazily so the ingestion extra is optional.
+
+    doc = fitz.open(path)
+    try:
+        return doc.page_count
+    finally:
+        doc.close()
+
+
+def _resolve_page_numbers(
+    path: str, *, pages: list[int] | None, max_pages: int | None
+) -> list[int]:
+    """Resolve the ordered 1-based page numbers to ingest.
+
+    Explicit `--pages` take priority (in the given order); otherwise the natural
+    document order is used. `--max-pages` caps the selection to the first N pages
+    so batching covers exactly the same pages the previous all-at-once flow did.
+    """
+    if pages:
+        selected = list(pages)
+    else:
+        selected = list(range(1, _pdf_page_count(path) + 1))
+    if max_pages is not None:
+        selected = selected[:max_pages]
+    return selected
+
+
+def _format_pages(pages: list[int]) -> str:
+    """Render a page list compactly for logs (first..last for a contiguous run)."""
+    if len(pages) > 1 and pages == list(range(pages[0], pages[-1] + 1)):
+        return f"{pages[0]}..{pages[-1]}"
+    return ", ".join(str(p) for p in pages)
 
 
 def main() -> None:
@@ -34,25 +77,54 @@ def main() -> None:
     parser.add_argument(
         "--concurrency",
         type=int,
-        default=8,
+        default=4,
         help="Maximum number of vision transcriptions running at once.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=10,
+        help="Pages per extract->chunk->index batch. Indexing each batch as it "
+        "is produced keeps prior progress if the run crashes mid-way.",
     )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    pages = extract_pdf(
-        args.pdf,
-        args.course,
-        dpi=args.dpi,
-        max_pages=args.max_pages,
-        pages=args.pages,
-        hybrid=args.hybrid,
-        concurrency=args.concurrency,
-    )
-    chunks = chunk_pages(pages)
-    index_chunks(chunks)
-    print(f"Ingested {len(chunks)} chunks from {args.pdf!r} into course {args.course!r}.")
+    if args.batch_size < 1:
+        parser.error("--batch-size must be >= 1")
+
+    page_numbers = _resolve_page_numbers(args.pdf, pages=args.pages, max_pages=args.max_pages)
+    if not page_numbers:
+        print(f"No pages selected from {args.pdf!r}; nothing to ingest.")
+        return
+
+    batches = [
+        page_numbers[i : i + args.batch_size] for i in range(0, len(page_numbers), args.batch_size)
+    ]
+    total_chunks = 0
+    for batch_no, batch_pages in enumerate(batches, start=1):
+        logger.info("batch %d/%d: pages %s", batch_no, len(batches), _format_pages(batch_pages))
+        pages = extract_pdf(
+            args.pdf,
+            args.course,
+            dpi=args.dpi,
+            pages=batch_pages,
+            hybrid=args.hybrid,
+            concurrency=args.concurrency,
+        )
+        chunks = chunk_pages(pages)
+        index_chunks(chunks)
+        total_chunks += len(chunks)
+        logger.info(
+            "batch %d/%d indexed: %d chunks (%d total so far)",
+            batch_no,
+            len(batches),
+            len(chunks),
+            total_chunks,
+        )
+
+    print(f"Ingested {total_chunks} chunks from {args.pdf!r} into course {args.course!r}.")
 
 
 if __name__ == "__main__":
