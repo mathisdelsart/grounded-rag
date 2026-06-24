@@ -33,6 +33,8 @@ _PROMPT = (
     "- Keep titles, bullet points and tables as Markdown.\n"
     "- For figures/diagrams, add a short description in [square brackets].\n"
     "- Transcribe only what is on the slide. Do not add, explain or comment.\n"
+    "- Output raw Markdown directly. Do NOT wrap the whole answer in a code "
+    "fence (no triple backticks around the response).\n"
     "- If the slide is empty, reply with an empty string."
 )
 
@@ -100,27 +102,36 @@ def _render_page(page, dpi: int) -> str:
 
 
 def _strip_code_fence(text: str) -> str:
-    """Remove a single fenced code block wrapping the whole text, if present.
+    """Remove a leading Markdown code fence artifact from a transcription.
 
-    The vision model sometimes wraps its entire output in a Markdown code fence
-    (e.g. an opening ```markdown line and a trailing ```), which would otherwise
-    pollute the stored chunk and its embedding. If the stripped text both opens
-    with a fence (optionally followed by a language tag) and ends with a closing
-    fence, the inner content is returned stripped. Otherwise the text is returned
-    unchanged, so inline backticks are never mangled and the call is idempotent.
+    The vision model sometimes wraps its output in a Markdown code fence (an
+    opening ```markdown line and a closing ```), which pollutes the stored chunk
+    and its embedding. The closing fence is not always the last line: a figure
+    caption can follow it. A leading fence in a slide transcription is always an
+    artifact, so when the stripped text starts with an opening fence line (```
+    optionally followed by a language tag), this removes that opening line and the
+    first subsequent line that is exactly a closing ```, keeping everything else
+    (including any content after the closing fence).
+
+    If the text does not start with a fence line it is returned unchanged, so
+    inline backticks are never mangled. The transformation is idempotent.
     """
     stripped = text.strip()
     lines = stripped.splitlines()
-    if len(lines) < 2:
+    if not lines:
         return text
-    if not lines[0].lstrip().startswith("```"):
-        return text
-    if lines[-1].strip() != "```":
-        return text
-    # First line must be just the fence plus an optional language tag (no code).
+    # The first line must be exactly an opening fence plus an optional language
+    # tag, with no other content on it.
     if not re.fullmatch(r"\s*```[A-Za-z0-9_+-]*\s*", lines[0]):
         return text
-    return "\n".join(lines[1:-1]).strip()
+    rest = lines[1:]
+    # Drop the first line that is exactly a closing fence; keep the remainder.
+    for i, line in enumerate(rest):
+        if line.strip() == "```":
+            kept = rest[:i] + rest[i + 1 :]
+            return "\n".join(kept).strip()
+    # Opening fence with no closing fence: still strip the artifact opener.
+    return "\n".join(rest).strip()
 
 
 def _vision_transcribe(image_uri: str, llm) -> str:

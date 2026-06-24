@@ -32,6 +32,26 @@ def test_strip_code_fence_without_language_tag():
     assert _strip_code_fence(text) == "# Title\nbody"
 
 
+def test_strip_code_fence_with_trailing_content_after_close():
+    # Real case: a figure caption follows the closing fence. Both fence lines
+    # must go, the inner content and the trailing caption must stay.
+    text = (
+        "```markdown\n"
+        "# Piecewise constant approximation\n"
+        "- One fundamental element\n"
+        "```\n"
+        "[Figure]: A graph showing the piecewise constant approximation"
+    )
+    expected = (
+        "# Piecewise constant approximation\n"
+        "- One fundamental element\n"
+        "[Figure]: A graph showing the piecewise constant approximation"
+    )
+    result = _strip_code_fence(text)
+    assert result == expected
+    assert "```" not in result
+
+
 def test_strip_code_fence_no_fence_passthrough():
     text = "# Title\nplain markdown content with no fence."
     assert _strip_code_fence(text) == text
@@ -43,7 +63,7 @@ def test_strip_code_fence_leaves_inline_backticks_intact():
 
 
 def test_strip_code_fence_is_idempotent():
-    once = _strip_code_fence("```markdown\n# Title\nbody\n```")
+    once = _strip_code_fence("```markdown\n# Title\nbody\n```\n[Figure]: caption after fence")
     assert _strip_code_fence(once) == once
 
 
