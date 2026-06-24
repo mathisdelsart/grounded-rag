@@ -16,11 +16,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect
 
+pytest.importorskip("sqlalchemy")
 pytest.importorskip("alembic.config")
 
 from alembic.config import Config  # noqa: E402
+from sqlalchemy import create_engine, inspect  # noqa: E402
 
 from alembic import command  # noqa: E402
 
