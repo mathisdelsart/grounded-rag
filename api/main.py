@@ -17,7 +17,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from agent.nodes.generate import generate
 from agent.nodes.grade import grade
 from answer import answer
+from config import get_settings
 from db.models import Student
 from db.session import (
     add_message,
@@ -65,6 +66,24 @@ app = FastAPI(
     description="Course tutor grounded in your own material.",
     lifespan=lifespan,
 )
+
+
+def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
+    """Enforce API-key authentication when one is configured.
+
+    When ``Settings.api_key`` is empty (the default) the API stays fully open and
+    this dependency is a no-op, preserving backward compatibility. When a key is
+    set, the request must carry a matching ``X-API-Key`` header; otherwise the
+    request is rejected with 401. ``/health`` never depends on this guard.
+    """
+    expected = get_settings().api_key
+    if not expected:
+        return
+    if x_api_key != expected:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing API key.",
+        )
 
 
 def _get_or_create_student(session: Session, student_id: str) -> Student:
@@ -136,7 +155,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/ask", response_model=AskResponse)
+@app.post("/ask", response_model=AskResponse, dependencies=[Depends(require_api_key)])
 def ask(request: AskRequest) -> dict[str, Any]:
     """Answer a question grounded in the course, or refuse if uncovered.
 
@@ -155,7 +174,7 @@ def ask(request: AskRequest) -> dict[str, Any]:
     }
 
 
-@app.post("/exercise", response_model=ExerciseResponse)
+@app.post("/exercise", response_model=ExerciseResponse, dependencies=[Depends(require_api_key)])
 def exercise(request: ExerciseRequest) -> dict[str, Any]:
     """Generate a course-grounded exercise on the requested notion.
 
@@ -169,7 +188,7 @@ def exercise(request: ExerciseRequest) -> dict[str, Any]:
     return {"problem": built["problem"], "refused": built["refused"]}
 
 
-@app.post("/grade", response_model=GradeResponse)
+@app.post("/grade", response_model=GradeResponse, dependencies=[Depends(require_api_key)])
 def grade_answer(request: GradeRequest) -> dict[str, Any]:
     """Grade the student's answer, optionally against a prior exercise.
 
@@ -184,7 +203,11 @@ def grade_answer(request: GradeRequest) -> dict[str, Any]:
     return {"score": verdict["score"], "feedback": verdict["feedback"]}
 
 
-@app.get("/history/{student_id}", response_model=list[HistoryItem])
+@app.get(
+    "/history/{student_id}",
+    response_model=list[HistoryItem],
+    dependencies=[Depends(require_api_key)],
+)
 def history(student_id: str, limit: int = 20) -> list[dict[str, str]]:
     """Return the student's most recent turns in chronological order.
 

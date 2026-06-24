@@ -302,3 +302,116 @@ def test_grade_does_not_write_to_history(client, monkeypatch):
 def test_missing_required_field_is_422(client, path, body):
     response = client.post(path, json=body)
     assert response.status_code == 422
+
+
+# --- API-key authentication --------------------------------------------------
+
+_API_KEY = "secret-key"
+
+
+def _set_api_key(monkeypatch, key):
+    """Override the API key the auth dependency reads, with everything mocked.
+
+    The dependency calls ``get_settings()`` from the ``api.main`` namespace, so
+    replacing it there lets us drive the configured key without touching the
+    process environment or the lru-cached real settings.
+    """
+    from config import Settings
+
+    settings = Settings(api_key=key)
+    monkeypatch.setattr(api_main, "get_settings", lambda: settings)
+
+
+def _stub_nodes(monkeypatch):
+    """Mock the grounded function and graph nodes so no LLM or network is hit."""
+    monkeypatch.setattr(
+        api_main,
+        "answer",
+        lambda question, *, k=5: {"answer": "ok", "refused": False, "sources": [], "raw": "ok"},
+    )
+    monkeypatch.setattr(
+        api_main,
+        "generate",
+        lambda state: {
+            "exercise": {"problem": "p", "solution": "s", "refused": False},
+            "retrieved": [],
+        },
+    )
+    monkeypatch.setattr(
+        api_main,
+        "grade",
+        lambda state: {"grade": {"score": 50, "feedback": "ok"}},
+    )
+
+
+def test_health_open_without_api_key(client, monkeypatch):
+    # /health stays open even when a key is configured (container healthchecks).
+    _set_api_key(monkeypatch, _API_KEY)
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("post", "/ask", {"student_id": "s1", "question": "q"}),
+        ("post", "/exercise", {"student_id": "s1", "notion": "n"}),
+        ("post", "/grade", {"student_id": "s1", "message": "m"}),
+        ("get", "/history/s1", None),
+    ],
+)
+def test_protected_endpoint_rejects_missing_key(client, monkeypatch, method, path, body):
+    _set_api_key(monkeypatch, _API_KEY)
+    _stub_nodes(monkeypatch)
+    response = client.request(method, path, json=body)
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("post", "/ask", {"student_id": "s1", "question": "q"}),
+        ("post", "/exercise", {"student_id": "s1", "notion": "n"}),
+        ("post", "/grade", {"student_id": "s1", "message": "m"}),
+        ("get", "/history/s1", None),
+    ],
+)
+def test_protected_endpoint_rejects_wrong_key(client, monkeypatch, method, path, body):
+    _set_api_key(monkeypatch, _API_KEY)
+    _stub_nodes(monkeypatch)
+    response = client.request(method, path, json=body, headers={"X-API-Key": "wrong"})
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("post", "/ask", {"student_id": "s1", "question": "q"}),
+        ("post", "/exercise", {"student_id": "s1", "notion": "n"}),
+        ("post", "/grade", {"student_id": "s1", "message": "m"}),
+        ("get", "/history/s1", None),
+    ],
+)
+def test_protected_endpoint_accepts_correct_key(client, monkeypatch, method, path, body):
+    _set_api_key(monkeypatch, _API_KEY)
+    _stub_nodes(monkeypatch)
+    response = client.request(method, path, json=body, headers={"X-API-Key": _API_KEY})
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("post", "/ask", {"student_id": "s1", "question": "q"}),
+        ("post", "/exercise", {"student_id": "s1", "notion": "n"}),
+        ("post", "/grade", {"student_id": "s1", "message": "m"}),
+        ("get", "/history/s1", None),
+    ],
+)
+def test_endpoints_open_when_no_key_configured(client, monkeypatch, method, path, body):
+    # Default (empty) key: the API is fully open, no header required.
+    _set_api_key(monkeypatch, "")
+    _stub_nodes(monkeypatch)
+    response = client.request(method, path, json=body)
+    assert response.status_code == 200
