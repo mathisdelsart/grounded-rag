@@ -79,8 +79,7 @@ def rerank(
         return []
     scores = scorer(question, [c.chunk.text for c in candidates])
     rescored = [
-        Retrieved(chunk=c.chunk, score=score)
-        for c, score in zip(candidates, scores, strict=True)
+        Retrieved(chunk=c.chunk, score=score) for c, score in zip(candidates, scores, strict=True)
     ]
     rescored.sort(key=lambda r: r.score, reverse=True)
     return rescored[:k]
