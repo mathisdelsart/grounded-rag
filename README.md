@@ -163,14 +163,19 @@ never state) is exactly what `grounded-rag` is built to avoid.
 
 ## Demo / Try it
 
-```bash
-git pull && docker compose up --build
-```
+Docker runs only the vector store; the API and UI run on the host (this keeps the image free of the
+heavy ML runtime).
 
-This brings up the full stack with the course already indexed in Qdrant:
+```bash
+docker compose up -d qdrant   # 1. start the vector store (course already indexed)
+make api                      # 2. FastAPI on http://localhost:8000
+make ui                       # 3. Streamlit UI on http://localhost:8501
+```
 
 - **Streamlit UI** — <http://localhost:8501> (Ask · Re-explain by level · Exercise · Grade · History)
 - **API docs** — <http://localhost:8000/docs>
+
+Do **not** run `docker compose down` while demoing — it stops Qdrant.
 
 A known-good in-course question, *"What is the piecewise constant approximation?"*, returns a cited
 answer with LaTeX preserved. An out-of-course question is refused with
