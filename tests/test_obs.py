@@ -87,9 +87,7 @@ def test_get_llm_attaches_callbacks_when_enabled(monkeypatch):
             captured["callbacks"] = callbacks
             return "configured-model"
 
-    monkeypatch.setattr(
-        config, "init_chat_model", lambda model, temperature: FakeModel()
-    )
+    monkeypatch.setattr(config, "init_chat_model", lambda model, temperature: FakeModel())
 
     result = config.get_llm()
     assert result == "configured-model"
