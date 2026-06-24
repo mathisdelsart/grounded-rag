@@ -14,6 +14,31 @@ from agent.nodes.explain import explain
 from agent.nodes.generate import generate
 from agent.nodes.grade import grade
 from agent.nodes.reexplain import reexplain
+from answer import REFUSAL
+from ingestion.schema import Chunk, Retrieved
+
+
+def _retrieved(page: int, text: str, score: float = 0.9) -> Retrieved:
+    chunk = Chunk(id=f"id{page}", course="Course", page=page, text=text)
+    return Retrieved(chunk=chunk, score=score)
+
+
+@pytest.fixture
+def fake_retrieve(monkeypatch):
+    """Patch retrieval.retrieve so generate never touches Qdrant.
+
+    Returns a setter; pass a list of Retrieved (or [] to simulate a miss).
+    """
+    holder = {"results": [], "question": None}
+
+    def _retrieve(question, **kwargs):
+        holder["question"] = question
+        return holder["results"]
+
+    import retrieval as retrieval_mod
+
+    monkeypatch.setattr(retrieval_mod, "retrieve", _retrieve)
+    return holder
 
 
 class _FakeMessage:
@@ -87,7 +112,8 @@ def test_classify_falls_back_to_keywords_when_llm_unusable(fake_llm):
 # --- (b) compiled graph routes a message to the expected node ----------------
 
 
-def test_graph_routes_generate_and_populates_exercise(fake_llm):
+def test_graph_routes_generate_and_populates_exercise(fake_llm, fake_retrieve):
+    fake_retrieve["results"] = [_retrieved(7, "Integral definition.")]
     fake_llm["reply"] = "EXERCISE:\nCompute X.\n\nSOLUTION:\nX = 42."
     app = build_graph()
     out = app.invoke({"message": "Give me an exercise on integrals"})
@@ -172,12 +198,39 @@ def test_graph_routes_explain_via_answer(monkeypatch, fake_llm):
 # --- node-level checks: each node writes only its own key --------------------
 
 
-def test_generate_node_parses_exercise_and_solution(fake_llm):
+def test_generate_node_grounds_on_retrieved_chunks(fake_llm, fake_retrieve):
+    fake_retrieve["results"] = [
+        _retrieved(3, "Approximation space V_j."),
+        _retrieved(4, "Projection onto V_j."),
+    ]
     fake_llm["reply"] = "EXERCISE:\nDo this.\n\nSOLUTION:\nThe answer."
-    out = generate({"message": "limits"})
-    assert set(out) == {"exercise"}
+    out = generate({"message": "the approximation space"})
+
+    assert set(out) == {"exercise", "retrieved"}
     assert out["exercise"]["problem"] == "Do this."
     assert out["exercise"]["solution"] == "The answer."
+    assert out["exercise"]["refused"] is False
+    # Sources backing the exercise are surfaced, like explain does.
+    assert out["retrieved"] == [
+        "(Course, p.3)",
+        "(Course, p.4)",
+    ]
+    # Retrieval drove the exercise: the prompt must contain the chunk text.
+    human_msg = fake_llm["last"].calls[0][-1][1]
+    assert "Approximation space V_j." in human_msg
+    assert "Projection onto V_j." in human_msg
+
+
+def test_generate_node_refuses_when_nothing_retrieved(fake_llm, fake_retrieve):
+    fake_retrieve["results"] = []  # nothing relevant in the course
+    out = generate({"message": "rough-set equivalence relations"})
+
+    assert out["exercise"]["refused"] is True
+    assert out["exercise"]["problem"] == REFUSAL
+    assert out["exercise"]["solution"] == ""
+    assert out["retrieved"] == []
+    # The model was never asked to invent an exercise.
+    assert fake_llm["last"] is None
 
 
 def test_grade_node_parses_verdict_and_uses_reference(fake_llm):
@@ -186,6 +239,8 @@ def test_grade_node_parses_verdict_and_uses_reference(fake_llm):
     assert set(out) == {"grade"}
     assert out["grade"]["score"] == 55
     assert out["grade"]["feedback"] == "Partly right."
+    # The internal raw model output must not leak into the verdict.
+    assert set(out["grade"]) == {"score", "feedback"}
 
 
 def test_grade_node_handles_unparseable_verdict(fake_llm):
@@ -193,6 +248,7 @@ def test_grade_node_handles_unparseable_verdict(fake_llm):
     out = grade({"message": "my answer"})
     assert out["grade"]["score"] == 0
     assert out["grade"]["feedback"] == "totally unstructured"
+    assert "raw" not in out["grade"]
 
 
 def test_reexplain_uses_previous_tutor_turn(fake_llm):

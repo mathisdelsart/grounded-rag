@@ -46,6 +46,5 @@ def grade(state: TutorState) -> TutorState:
     human = f"Reference solution:\n{reference}\n\nStudent answer:\n{state['message']}"
     raw = get_llm("grade").invoke([("system", _SYSTEM), ("human", human)]).content.strip()
 
-    verdict = _parse(raw)
-    verdict["raw"] = raw
-    return {"grade": verdict}
+    # Keep raw parsing internal; the node returns only the clean verdict.
+    return {"grade": _parse(raw)}
