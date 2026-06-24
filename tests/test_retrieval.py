@@ -13,36 +13,51 @@ from qdrant_client.models import Filter
 import retrieval
 
 
+def _point(point_id, score, text, *, course="Wavelet Transform", chapter="Intro", page=11):
+    return SimpleNamespace(
+        id=point_id,
+        score=score,
+        payload={"course": course, "chapter": chapter, "page": page, "text": text},
+    )
+
+
 class _FakeQdrantClient:
     """Captures query_points kwargs and returns canned points."""
 
     last_kwargs: dict | None = None
+    points: list = [_point("p1", 0.91, "the chunk text")]
 
     def __init__(self, *args, **kwargs):
         pass
 
     def query_points(self, **kwargs):
         _FakeQdrantClient.last_kwargs = kwargs
-        point = SimpleNamespace(
-            id="p1",
-            score=0.91,
-            payload={
-                "course": "Wavelet Transform",
-                "chapter": "Intro",
-                "page": 11,
-                "text": "the chunk text",
-            },
-        )
-        return SimpleNamespace(points=[point])
+        return SimpleNamespace(points=list(_FakeQdrantClient.points))
 
 
 @pytest.fixture(autouse=True)
 def _no_model_no_network(monkeypatch):
     _FakeQdrantClient.last_kwargs = None
+    _FakeQdrantClient.points = [_point("p1", 0.91, "the chunk text")]
     # Never load the real embedding model.
     monkeypatch.setattr(retrieval, "embed_query", lambda text: [0.1, 0.2, 0.3])
     # Never reach a real Qdrant server.
     monkeypatch.setattr(retrieval, "QdrantClient", _FakeQdrantClient)
+
+
+def _set_settings(monkeypatch, **overrides):
+    """Override the settings seen by retrieval without loading real ones."""
+    base = {
+        "qdrant_url": "http://localhost:6333",
+        "qdrant_collection": "courses",
+        "similarity_threshold": 0.5,
+        "reranker_model": "",
+        "rerank_candidates": 20,
+    }
+    base.update(overrides)
+    settings = SimpleNamespace(**base)
+    monkeypatch.setattr(retrieval, "get_settings", lambda: settings)
+    return settings
 
 
 def test_no_filter_when_course_and_chapter_none():
@@ -108,3 +123,90 @@ def test_answer_threads_course_and_chapter_to_retrieve(monkeypatch):
         "course": "Wavelet Transform",
         "chapter": "Intro",
     }
+
+
+# --- Reranker --------------------------------------------------------------
+
+
+def _make_retrieved(chunk_id, text, score=0.0):
+    chunk = retrieval.Chunk(id=chunk_id, course="C", page=1, text=text, chapter=None)
+    return retrieval.Retrieved(chunk=chunk, score=score)
+
+
+def test_rerank_helper_orders_by_score_and_truncates():
+    candidates = [
+        _make_retrieved("a", "low", score=0.9),
+        _make_retrieved("b", "high", score=0.1),
+        _make_retrieved("c", "mid", score=0.5),
+    ]
+    # Fake scorer: relevance keyed by text, ignoring the original similarity.
+    fake_scores = {"low": 0.1, "high": 0.9, "mid": 0.5}
+
+    def scorer(question, texts):
+        return [fake_scores[t] for t in texts]
+
+    out = retrieval.rerank("q", candidates, k=2, scorer=scorer)
+    assert [r.chunk.id for r in out] == ["b", "c"]
+    # The cross-encoder score replaces the original similarity.
+    assert [r.score for r in out] == [0.9, 0.5]
+
+
+def test_rerank_helper_handles_empty():
+    assert retrieval.rerank("q", [], k=3, scorer=lambda q, t: []) == []
+
+
+def test_dense_path_unchanged_when_no_reranker(monkeypatch):
+    _set_settings(monkeypatch, reranker_model="")
+    results = retrieval.retrieve("q")
+    kwargs = _FakeQdrantClient.last_kwargs
+    # Default path: threshold applied, only k candidates fetched.
+    assert kwargs["limit"] == 5
+    assert kwargs["score_threshold"] == 0.5
+    assert [r.chunk.id for r in results] == ["p1"]
+    assert results[0].score == 0.91
+
+
+def test_reranker_reorders_and_truncates_to_k(monkeypatch):
+    _set_settings(monkeypatch, reranker_model="fake-model", rerank_candidates=20)
+    _FakeQdrantClient.points = [
+        _point("p1", 0.91, "alpha"),
+        _point("p2", 0.80, "bravo"),
+        _point("p3", 0.70, "charlie"),
+    ]
+    # Reverse the dense order via the fake cross-encoder.
+    fake_scores = {"alpha": 0.1, "bravo": 0.5, "charlie": 0.9}
+
+    def scorer(question, texts):
+        return [fake_scores[t] for t in texts]
+
+    results = retrieval.retrieve("q", k=2, scorer=scorer)
+    assert [r.chunk.id for r in results] == ["p3", "p2"]
+    assert [r.score for r in results] == [0.9, 0.5]
+
+
+def test_reranker_fetches_more_candidates_without_threshold(monkeypatch):
+    _set_settings(monkeypatch, reranker_model="fake-model", rerank_candidates=20)
+    retrieval.retrieve("q", k=5, scorer=lambda question, texts: [0.0] * len(texts))
+    kwargs = _FakeQdrantClient.last_kwargs
+    assert kwargs["limit"] == 20
+    assert kwargs["score_threshold"] is None
+
+
+def test_reranker_limit_at_least_k(monkeypatch):
+    _set_settings(monkeypatch, reranker_model="fake-model", rerank_candidates=3)
+    retrieval.retrieve("q", k=5, scorer=lambda question, texts: [0.0] * len(texts))
+    assert _FakeQdrantClient.last_kwargs["limit"] == 5
+
+
+def test_reranker_keeps_course_chapter_filter(monkeypatch):
+    _set_settings(monkeypatch, reranker_model="fake-model")
+    retrieval.retrieve(
+        "q",
+        course="Wavelet Transform",
+        chapter="Intro",
+        scorer=lambda question, texts: [0.0] * len(texts),
+    )
+    flt = _FakeQdrantClient.last_kwargs["query_filter"]
+    assert isinstance(flt, Filter)
+    keys = {(c.key, c.match.value) for c in flt.must}
+    assert keys == {("course", "Wavelet Transform"), ("chapter", "Intro")}

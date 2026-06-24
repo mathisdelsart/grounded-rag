@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     # Retrieval threshold, calibrated empirically. Below it, the answer is refused.
     similarity_threshold: float = 0.5
 
+    # Cross-encoder reranker (opt-in precision boost, no re-ingestion needed).
+    # "" disables it (dense path unchanged); a model name (e.g.
+    # "cross-encoder/ms-marco-MiniLM-L-6-v2") enables reranking. It needs the
+    # `ingestion` extra (sentence-transformers) and runs locally.
+    reranker_model: str = ""
+
+    # When the reranker is enabled, how many candidates to fetch from Qdrant
+    # before reranking and truncating back to k. Ignored when disabled.
+    rerank_candidates: int = 20
+
     # Relational store (SQLite in development, PostgreSQL later).
     database_url: str = "sqlite:///./app.db"
 
