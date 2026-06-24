@@ -20,8 +20,14 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --extra api --extra agent
 
-# Copy the application source.
-COPY . .
+# Copy only the application source needed at runtime. An explicit allowlist
+# keeps local-only paths (worktrees, editor config, course PDFs) out of the
+# image without having to enumerate them in .dockerignore.
+COPY README.md config.py retrieval.py answer.py ask.py ./
+COPY api/ ./api/
+COPY agent/ ./agent/
+COPY ingestion/ ./ingestion/
+COPY eval/ ./eval/
 
 EXPOSE 8000
 
