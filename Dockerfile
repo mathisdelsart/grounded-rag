@@ -1,7 +1,7 @@
-# Serving image for the FastAPI app.
-# Builds with uv against the pinned uv.lock and installs only the extras
-# needed to serve the API (api + agent). The heavy `ingestion` extra (torch,
-# marker-pdf) is intentionally excluded to keep the image small.
+# Serving image for the FastAPI app and the Streamlit UI.
+# Builds with uv against the pinned uv.lock and installs the extras needed to
+# serve the API and the UI (api + agent + ui). The heavy `ingestion` extra
+# (torch, marker-pdf) is intentionally excluded to keep the image small.
 
 FROM python:3.12-slim
 
@@ -18,16 +18,21 @@ WORKDIR /app
 # Install dependencies first for better layer caching. Only the lockfile and
 # project metadata are needed to resolve and sync the environment.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --extra api --extra agent
+RUN uv sync --frozen --no-install-project --extra api --extra agent --extra ui
 
-# Copy only the application source needed at runtime. An explicit allowlist
-# keeps local-only paths (worktrees, editor config, course PDFs) out of the
-# image without having to enumerate them in .dockerignore.
-COPY README.md config.py retrieval.py answer.py ask.py ./
+# Copy the application source needed at runtime. Root modules are copied with a
+# glob so newly added top-level modules are picked up automatically; the named
+# package directories cover the rest. This keeps local-only paths (worktrees,
+# editor config, course PDFs) out of the image without enumerating them in
+# .dockerignore.
+COPY README.md ./
+COPY *.py ./
 COPY api/ ./api/
 COPY agent/ ./agent/
 COPY ingestion/ ./ingestion/
 COPY eval/ ./eval/
+COPY db/ ./db/
+COPY ui/ ./ui/
 
 # Run as an unprivileged user. The app reads no files it must own at runtime,
 # so a plain non-root user (owning /app) is enough.

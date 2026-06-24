@@ -3,9 +3,14 @@ services:
     build: .
     ports:
       - "8000:8000"   # FastAPI / uvicorn
+    # Load secrets/settings (e.g. OPENAI_API_KEY) from .env when present. The
+    # `environment` block below takes precedence, so QDRANT_URL stays correct
+    # inside the container even if .env sets it for local (host) use.
+    env_file:
+      - path: .env
+        required: false
     environment:
       QDRANT_URL: http://qdrant:6333
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       qdrant:
         condition: service_healthy
@@ -19,6 +24,28 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 3
+    restart: unless-stopped
+    networks:
+      - grounded-rag
+
+  ui:
+    build: .
+    command:
+      - streamlit
+      - run
+      - ui/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+    ports:
+      - "8501:8501"   # Streamlit web UI
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_BASE_URL: http://app:8000
+    depends_on:
+      - app
     restart: unless-stopped
     networks:
       - grounded-rag
