@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, SmallInteger, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -61,6 +61,9 @@ class Student(Base):
         back_populates="student", cascade="all, delete-orphan"
     )
     quizzes: Mapped[list[Quiz]] = relationship(
+        back_populates="student", cascade="all, delete-orphan"
+    )
+    feedback: Mapped[list[Feedback]] = relationship(
         back_populates="student", cascade="all, delete-orphan"
     )
 
@@ -167,3 +170,27 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     student: Mapped[Student] = relationship(back_populates="messages")
+
+
+class Feedback(Base):
+    """A student's thumbs up/down on a tutor answer, kept for later evaluation.
+
+    The rating is ``1`` for thumbs up and ``-1`` for thumbs down. The question
+    and answer text are captured verbatim so each row is self-contained and can
+    feed offline evaluation without joining back to volatile conversation
+    history. The optional ``note`` lets the student explain a thumbs down.
+    """
+
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("students.id", ondelete="CASCADE"), index=True
+    )
+    rating: Mapped[int] = mapped_column(SmallInteger)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    student: Mapped[Student] = relationship(back_populates="feedback")

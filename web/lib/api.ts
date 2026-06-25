@@ -58,6 +58,21 @@ export interface HistoryItem {
   created_at: string;
 }
 
+/** A student's thumbs up (1) or down (-1) on a tutor answer. */
+export type FeedbackRating = 1 | -1;
+
+export interface FeedbackRequest {
+  student_id: string;
+  rating: FeedbackRating;
+  question: string;
+  answer: string;
+  note?: string | null;
+}
+
+export interface FeedbackResponse {
+  id: number;
+}
+
 /** Runtime overrides for the connection, sourced from the settings panel. */
 export interface ConnectionConfig {
   baseUrl?: string;
@@ -408,6 +423,25 @@ export async function login(
 /** Return the currently authenticated user for the supplied bearer token. */
 export async function me(config?: ConnectionConfig): Promise<AuthUser> {
   return request<AuthUser>("/auth/me", { method: "GET", headers: buildHeaders(config) }, config);
+}
+
+/** Record a thumbs up/down on a tutor answer. The note is only sent when set. */
+export async function sendFeedback(
+  body: FeedbackRequest,
+  config?: ConnectionConfig,
+): Promise<FeedbackResponse> {
+  const payload: FeedbackRequest = {
+    student_id: body.student_id,
+    rating: body.rating,
+    question: body.question,
+    answer: body.answer,
+  };
+  if (body.note && body.note.trim()) payload.note = body.note.trim();
+  return request<FeedbackResponse>(
+    "/feedback",
+    { method: "POST", headers: buildHeaders(config, true), body: JSON.stringify(payload) },
+    config,
+  );
 }
 
 /** Return the student's most recent turns, chronological. */

@@ -15,6 +15,7 @@ import { TextField, TextArea } from "@/components/TextField";
 import { Markdown } from "@/components/Markdown";
 import { CitationChip } from "@/components/CitationChip";
 import { ExportActions } from "@/components/ExportActions";
+import { AnswerFeedback } from "@/components/AnswerFeedback";
 import { EmptyState, RefusalBanner, Skeleton } from "@/components/States";
 import { LevelSelector } from "@/components/LevelSelector";
 import { useToast } from "@/components/Toast";
@@ -204,6 +205,16 @@ export function AskPanel({ studentId, config, lastAnswer, setLastAnswer }: AskPa
                   question={question}
                   answer={lastAnswer.answer}
                   sources={lastAnswer.sources}
+                />
+              </div>
+
+              <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                <AnswerFeedback
+                  key={lastAnswer.answer}
+                  studentId={studentId}
+                  question={question}
+                  answer={lastAnswer.answer}
+                  config={config}
                 />
               </div>
 

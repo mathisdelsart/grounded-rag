@@ -113,6 +113,17 @@ const en = {
   "ask.reexplainPrompt": "Didn't get it? Re-explain at a level:",
   "ask.reexplain": "Re-explain",
 
+  // Answer feedback
+  "feedback.prompt": "Was this answer helpful?",
+  "feedback.up": "Helpful",
+  "feedback.upAria": "Mark this answer as helpful",
+  "feedback.down": "Not helpful",
+  "feedback.downAria": "Mark this answer as not helpful",
+  "feedback.notePlaceholder": "Optional: what was wrong?",
+  "feedback.send": "Send feedback",
+  "feedback.thanks": "Thanks for your feedback.",
+  "feedback.failed": "Could not send feedback.",
+
   // Re-explain panel
   "reexplain.title": "Re-explain the last answer",
   "reexplain.description":
@@ -295,6 +306,17 @@ const fr: Record<TranslationKey, string> = {
     "Posez une question ci-dessus pour voir une explication ancrée et citée.",
   "ask.reexplainPrompt": "Pas compris ? Réexpliquer à un niveau :",
   "ask.reexplain": "Réexpliquer",
+
+  // Answer feedback
+  "feedback.prompt": "Cette réponse vous a-t-elle été utile ?",
+  "feedback.up": "Utile",
+  "feedback.upAria": "Marquer cette réponse comme utile",
+  "feedback.down": "Pas utile",
+  "feedback.downAria": "Marquer cette réponse comme non utile",
+  "feedback.notePlaceholder": "Optionnel : qu'est-ce qui n'allait pas ?",
+  "feedback.send": "Envoyer le retour",
+  "feedback.thanks": "Merci pour votre retour.",
+  "feedback.failed": "Impossible d'envoyer le retour.",
 
   // Re-explain panel
   "reexplain.title": "Réexpliquer la dernière réponse",
