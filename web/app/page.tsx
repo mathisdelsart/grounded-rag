@@ -5,6 +5,7 @@ import type { AskResponse, ConnectionConfig, ExerciseResponse } from "@/lib/api"
 import { KEYS, generateStudentId, readLocal, writeLocal } from "@/lib/storage";
 import { Tabs, type TabItem } from "@/components/Tabs";
 import { HealthBadge } from "@/components/HealthBadge";
+import { AuthMenu } from "@/components/AuthMenu";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { AskPanel } from "@/components/panels/AskPanel";
 import { ReexplainPanel } from "@/components/panels/ReexplainPanel";
@@ -27,6 +28,8 @@ export default function Home() {
   const [studentId, setStudentId] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [token, setToken] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
   const [active, setActive] = useState("ask");
 
   // Cross-tab state lifted to the page so panels can share the last answer
@@ -45,13 +48,33 @@ export default function Home() {
     setStudentId(id);
     setBaseUrl(readLocal(KEYS.baseUrl));
     setApiKey(readLocal(KEYS.apiKey));
+    setToken(readLocal(KEYS.authToken));
+    setAuthEmail(readLocal(KEYS.authEmail));
     setReady(true);
   }, []);
 
   const config: ConnectionConfig = useMemo(
-    () => ({ baseUrl: baseUrl || undefined, apiKey: apiKey || undefined }),
-    [baseUrl, apiKey],
+    () => ({
+      baseUrl: baseUrl || undefined,
+      apiKey: apiKey || undefined,
+      token: token || undefined,
+    }),
+    [baseUrl, apiKey, token],
   );
+
+  function onLogin(nextToken: string, nextEmail: string) {
+    setToken(nextToken);
+    setAuthEmail(nextEmail);
+    writeLocal(KEYS.authToken, nextToken);
+    writeLocal(KEYS.authEmail, nextEmail);
+  }
+
+  function onLogout() {
+    setToken("");
+    setAuthEmail("");
+    writeLocal(KEYS.authToken, "");
+    writeLocal(KEYS.authEmail, "");
+  }
 
   function saveSettings(next: { studentId: string; baseUrl: string; apiKey: string }) {
     setStudentId(next.studentId);
@@ -79,7 +102,15 @@ export default function Home() {
               <p className="text-xs text-zinc-400">Answers only from your course</p>
             </div>
           </div>
-          <HealthBadge config={config} />
+          <div className="flex items-center gap-3">
+            <HealthBadge config={config} />
+            <AuthMenu
+              config={config}
+              email={authEmail || null}
+              onLogin={onLogin}
+              onLogout={onLogout}
+            />
+          </div>
         </div>
       </header>
 

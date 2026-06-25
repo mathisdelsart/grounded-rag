@@ -62,6 +62,20 @@ export interface HistoryItem {
 export interface ConnectionConfig {
   baseUrl?: string;
   apiKey?: string;
+  /** Bearer JWT for the logged-in user. Sent in addition to the API key. */
+  token?: string;
+}
+
+/** Minimal public view of an authenticated user. */
+export interface AuthUser {
+  id: number;
+  email: string;
+}
+
+/** Token returned by a successful login. */
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
 }
 
 /** Error thrown for any failed request, carrying the HTTP status when known. */
@@ -102,6 +116,11 @@ function buildHeaders(config?: ConnectionConfig, json = false): Headers {
   const key = resolveApiKey(config);
   if (key) {
     headers.set("X-API-Key", key);
+  }
+  // Additive to the API key: when a user is logged in, also send the bearer JWT.
+  const token = config?.token?.trim();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
   return headers;
 }
@@ -350,6 +369,45 @@ export async function gradeQuizAnswer(
     },
     config,
   );
+}
+
+/** Create a new account. Returns the created user (id + email). */
+export async function register(
+  email: string,
+  password: string,
+  config?: ConnectionConfig,
+): Promise<AuthUser> {
+  return request<AuthUser>(
+    "/auth/register",
+    {
+      method: "POST",
+      headers: buildHeaders(config, true),
+      body: JSON.stringify({ email, password }),
+    },
+    config,
+  );
+}
+
+/** Log in and obtain a bearer access token. */
+export async function login(
+  email: string,
+  password: string,
+  config?: ConnectionConfig,
+): Promise<TokenResponse> {
+  return request<TokenResponse>(
+    "/auth/login",
+    {
+      method: "POST",
+      headers: buildHeaders(config, true),
+      body: JSON.stringify({ email, password }),
+    },
+    config,
+  );
+}
+
+/** Return the currently authenticated user for the supplied bearer token. */
+export async function me(config?: ConnectionConfig): Promise<AuthUser> {
+  return request<AuthUser>("/auth/me", { method: "GET", headers: buildHeaders(config) }, config);
 }
 
 /** Return the student's most recent turns, chronological. */

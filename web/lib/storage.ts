@@ -4,6 +4,8 @@ export const KEYS = {
   studentId: "grounded-rag:student_id",
   baseUrl: "grounded-rag:base_url",
   apiKey: "grounded-rag:api_key",
+  authToken: "grounded-rag:auth_token",
+  authEmail: "grounded-rag:auth_email",
 } as const;
 
 /** Read a string from localStorage, returning `fallback` when unavailable. */
