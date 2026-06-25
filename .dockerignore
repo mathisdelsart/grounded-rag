@@ -1,0 +1,56 @@
+# Keep the build context tiny: only the API runtime source is needed.
+# Everything excluded here is either dev-only, frontend, data, or rebuilt
+# inside the image.
+
+# Version control and CI
+.git
+.github
+.gitignore
+
+# Python caches and bytecode
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.pyright
+
+# Virtual environments (the image builds its own)
+.venv
+venv
+env
+
+# Local secrets and environment files
+.env
+*.env
+!.env.example
+
+# Local databases and caches
+*.db
+*.sqlite
+.llm_cache.sqlite
+qdrant_storage
+
+# Tests and evaluation data (not part of the runtime)
+tests
+eval
+
+# Frontend (served separately, not by this image)
+web
+ui
+
+# Documentation and project notes
+docs
+*.md
+!README.md
+
+# Course material / PDFs (personal data, never shipped)
+*.pdf
+
+# Editor and OS noise
+.vscode
+.idea
+.DS_Store
