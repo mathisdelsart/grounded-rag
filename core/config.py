@@ -68,6 +68,18 @@ class Settings(BaseSettings):
     # (or to rerank_candidates when the reranker is also enabled).
     hybrid_prefetch: int = 50
 
+    # Opt-in multi-query retrieval expansion (query rewriting). False keeps the
+    # single-query dense/hybrid path byte-identical. When True, the question is
+    # rewritten into a few diverse sub-queries (see `multi_query_n`); retrieval
+    # runs for each and the candidate lists are fused before the SAME similarity
+    # threshold, refusal and optional reranker are applied. It only widens recall
+    # and never weakens the refusal guard.
+    multi_query: bool = False
+
+    # When multi-query is active, how many LLM-generated rewrites to request in
+    # addition to the original question. Ignored when `multi_query` is False.
+    multi_query_n: int = 3
+
     # Relational store (SQLite in development, PostgreSQL later).
     database_url: str = "sqlite:///./app.db"
 
