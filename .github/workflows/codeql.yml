@@ -1,0 +1,42 @@
+name: CodeQL
+
+# Static security analysis (CodeQL) for the Python application. Runs on pushes
+# and pull requests targeting the default branch, plus a weekly schedule so new
+# advisories are picked up even without code changes.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Mondays at 06:00 UTC.
+    - cron: "0 6 * * 1"
+
+jobs:
+  analyze:
+    name: Analyze (python)
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for CodeQL to upload its results to the Security tab.
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # `security-and-quality` adds maintainability queries on top of the
+          # default security suite.
+          queries: security-and-quality
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

@@ -1,0 +1,59 @@
+version: 2
+
+# Weekly dependency update PRs across the project's ecosystems. Limits keep the
+# number of concurrently open PRs manageable for a solo maintainer.
+updates:
+  # Python dependencies. The project is managed with uv (pyproject.toml +
+  # uv.lock); Dependabot does not (yet) have a dedicated `uv` ecosystem, so the
+  # `pip` ecosystem is used here, which understands pyproject.toml at the repo
+  # root.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # GitHub Actions used by the workflows under .github/workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Node dependencies for the Next.js web frontend (web/).
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
+
+  # The root Dockerfile (base images such as python:3.12-slim).
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
