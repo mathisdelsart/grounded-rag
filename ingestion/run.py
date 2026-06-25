@@ -1,7 +1,15 @@
-"""Ingestion entry point: PDF -> pages -> chunks -> Qdrant.
+"""Ingestion entry point: document -> pages -> chunks -> Qdrant.
 
 Usage:
     python -m ingestion.run path/to/course.pdf --course "Wavelet Transform"
+    python -m ingestion.run path/to/notes.md  --course "Wavelet Transform"
+
+The input type is detected by extension. PDFs go through the math-aware vision
+pipeline (slides). Markdown (`.md`) and text (`.txt`) files are plain prose:
+they are read straight from disk as UTF-8 and split into overlapping prose
+windows -- no PyMuPDF, no vision model, no network. PDF-only flags (`--pages`,
+`--max-pages`, `--dpi`, `--hybrid`, `--concurrency`) are no-ops for text inputs;
+`--course`, `--sparse` and `--batch-size` apply to both.
 
 Pages are processed in batches (extract -> chunk -> index per batch) so a crash
 mid-run keeps the progress of earlier batches instead of losing everything. Chunk
@@ -15,6 +23,8 @@ import logging
 from ingestion.chunk import chunk_pages
 from ingestion.extract import extract_pdf
 from ingestion.index import index_chunks
+from ingestion.load import is_text_file, load_text_file
+from ingestion.schema import Page
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +65,41 @@ def _format_pages(pages: list[int]) -> str:
     return ", ".join(str(p) for p in pages)
 
 
+def _index_text_file(path: str, course: str, *, sparse: bool, batch_size: int) -> int:
+    """Ingest a `.md`/`.txt` prose file: load -> chunk -> index in batches.
+
+    The whole file is read once and split into prose windows (`Page`s); those
+    windows are then chunked and indexed in batches of `batch_size`, mirroring
+    the PDF path's per-batch indexing so a crash keeps earlier progress.
+    PDF-only options (pages/dpi/vision/concurrency) do not apply here. Returns
+    the total number of indexed chunks.
+    """
+    pages: list[Page] = load_text_file(path, course)
+    if not pages:
+        print(f"No content extracted from {path!r}; nothing to ingest.")
+        return 0
+
+    batches = [pages[i : i + batch_size] for i in range(0, len(pages), batch_size)]
+    total_chunks = 0
+    for batch_no, batch_pages in enumerate(batches, start=1):
+        chunks = chunk_pages(batch_pages)
+        index_chunks(chunks, sparse=sparse)
+        total_chunks += len(chunks)
+        logger.info(
+            "batch %d/%d indexed: %d chunks (%d total so far)",
+            batch_no,
+            len(batches),
+            len(chunks),
+            total_chunks,
+        )
+    return total_chunks
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ingest a course PDF into Qdrant.")
-    parser.add_argument("pdf", help="Path to the course PDF.")
+    parser = argparse.ArgumentParser(
+        description="Ingest course material (PDF, Markdown or text) into Qdrant."
+    )
+    parser.add_argument("pdf", help="Path to the course file (.pdf, .md or .txt).")
     parser.add_argument("--course", required=True, help="Course name (used in citations).")
     parser.add_argument("--max-pages", type=int, default=None, help="Cap pages while iterating.")
     parser.add_argument(
@@ -100,6 +142,16 @@ def main() -> None:
 
     if args.batch_size < 1:
         parser.error("--batch-size must be >= 1")
+
+    # Markdown/text inputs are plain prose: skip the PDF/vision pipeline and the
+    # PDF-only flags (pages/dpi/hybrid/concurrency are no-ops here).
+    if is_text_file(args.pdf):
+        total_chunks = _index_text_file(
+            args.pdf, args.course, sparse=args.sparse, batch_size=args.batch_size
+        )
+        if total_chunks:
+            print(f"Ingested {total_chunks} chunks from {args.pdf!r} into course {args.course!r}.")
+        return
 
     page_numbers = _resolve_page_numbers(args.pdf, pages=args.pages, max_pages=args.max_pages)
     if not page_numbers:

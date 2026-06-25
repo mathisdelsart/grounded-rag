@@ -8,6 +8,7 @@ Endpoints:
     POST /grade             grade a student's answer
     POST /quiz              generate a grounded multi-question quiz (no solutions)
     POST /quiz/{id}/grade   grade one quiz answer against its stored reference
+    GET  /courses           list the distinct courses indexed in Qdrant
     GET  /history/{id}      recent conversation turns for a student
 
 The layer stays thin: each route delegates to the existing grounded functions
@@ -18,12 +19,13 @@ are persisted as conversation history, and ``/history`` replays them.
 
 import hmac
 import json
+import logging
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine, select
 
@@ -42,9 +44,16 @@ from api.auth import (
     login_user,
     register_user,
 )
-from api.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
+from api.logging_config import configure_logging, request_id_var
+from api.middleware import (
+    REQUEST_ID_HEADER,
+    RateLimitMiddleware,
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+)
 from core.answer import answer, stream_answer
 from core.config import get_settings
+from core.courses import list_courses
 from db.models import Student
 from db.session import (
     add_message,
@@ -55,6 +64,8 @@ from db.session import (
     init_db,
     recent_messages,
 )
+
+logger = logging.getLogger("api")
 
 # Bound on startup (or injected by tests via ``configure_engine``). Keeping the
 # engine module-level lets tests swap in an in-memory SQLite database.
@@ -75,7 +86,8 @@ def configure_engine(engine: Engine) -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Initialize the database from the configured engine on startup."""
+    """Configure structured logging and the database on startup."""
+    configure_logging(get_settings().log_level)
     if _engine is None:
         configure_engine(create_engine_from_settings())
     yield
@@ -87,14 +99,58 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Hardening middleware (both opt-in/safe). Security headers are always added and
+# Hardening middleware (all opt-in/safe). Security headers are always added and
 # never alter the body or status. Rate limiting is a no-op unless
-# `rate_limit_per_minute` is positive, so the default config is unthrottled.
-# Starlette runs the last-added middleware first, so security headers are the
-# outermost layer: they wrap every response, including the limiter's 429, while
-# the rate limiter still rejects throttled requests before they reach a route.
+# `rate_limit_per_minute` is positive, so the default config is unthrottled. The
+# request-id middleware is always active and only adds a header + logging
+# context.
+#
+# Starlette runs the last-added middleware first, so the request-id layer is
+# outermost: it sets the request-id contextvar before anything else runs (so the
+# security headers, the rate limiter's 429, and the global error handler are all
+# logged with — and, for the response, carry — the id), and resets it last.
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestIdMiddleware)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return a consistent JSON body for unhandled (500) errors, leaking nothing.
+
+    This handler is intentionally scoped to *unhandled* exceptions only:
+    FastAPI's own handling of ``HTTPException`` (401/404/...) and request
+    validation (422) is left untouched, so every existing error-shape assertion
+    keeps passing. Here we log the full exception server-side at error level
+    (with traceback and the request id), then return a generic message plus the
+    request id to the client; the exception type, args and stack trace are never
+    sent to the client.
+
+    The request id is read from the request scope's state rather than the
+    contextvar: Starlette's error middleware runs above ``RequestIdMiddleware``,
+    which has already reset the contextvar by the time this handler runs. We also
+    re-attach the ``X-Request-ID`` response header here, since this 500 response
+    bypasses that middleware's header-injecting wrapper.
+    """
+    request_id = request.scope.get("state", {}).get("request_id") or request_id_var.get()
+    logger.error(
+        "Unhandled exception while handling %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+    )
+    headers = {REQUEST_ID_HEADER: request_id} if request_id else None
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error": {
+                "type": "internal_server_error",
+                "message": "An internal error occurred. Please retry later.",
+                "request_id": request_id,
+            }
+        },
+        headers=headers,
+    )
 
 
 def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
@@ -242,6 +298,12 @@ class HistoryItem(BaseModel):
     created_at: str
 
 
+class CoursesResponse(BaseModel):
+    """The distinct courses currently indexed in Qdrant, sorted."""
+
+    courses: list[str]
+
+
 class StudentOut(BaseModel):
     """A student identity owned by the authenticated caller."""
 
@@ -254,6 +316,24 @@ class StudentOut(BaseModel):
 def health() -> dict[str, str]:
     """Liveness probe."""
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def ready() -> dict[str, str]:
+    """Readiness probe: report whether the service can serve traffic.
+
+    Distinct from ``/health`` (liveness): readiness reflects that startup wiring
+    completed, primarily that the database engine is bound. It performs a light,
+    dependency-free check (no LLM, no network) so it is safe to poll frequently
+    from an orchestrator. Returns 200 with ``{"status": "ready"}`` when the
+    engine is configured, otherwise 503 with ``{"status": "not ready"}``.
+    """
+    if _engine is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service is not ready: database engine is not configured.",
+        )
+    return {"status": "ready"}
 
 
 @app.post(
@@ -504,6 +584,21 @@ def quiz_grade(
             detail="Quiz question not found.",
         )
     return {"score": verdict["score"], "feedback": verdict["feedback"]}
+
+
+@app.get(
+    "/courses",
+    response_model=CoursesResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def courses() -> dict[str, list[str]]:
+    """List the distinct courses currently indexed in Qdrant.
+
+    Lets a client discover the available courses dynamically (e.g. to populate a
+    picker) instead of hardcoding them. Returns an empty list when nothing is
+    indexed yet; it never reaches the LLM and runs no retrieval.
+    """
+    return {"courses": list_courses()}
 
 
 @app.get(
