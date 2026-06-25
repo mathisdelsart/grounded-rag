@@ -74,3 +74,20 @@ def test_downgrade_removes_all_tables(database_url: str) -> None:
         engine.dispose()
 
     assert not (EXPECTED_TABLES & tables)
+
+
+def test_feedback_table_upgrade_and_downgrade(database_url: str) -> None:
+    """The 0005 migration creates the ``feedback`` table, and ``downgrade`` drops it."""
+    cfg = _make_config(database_url)
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(database_url, future=True)
+    try:
+        assert "feedback" in set(inspect(engine).get_table_names())
+        columns = {c["name"] for c in inspect(engine).get_columns("feedback")}
+        assert {"id", "student_id", "rating", "note", "question", "answer", "created_at"} <= columns
+
+        command.downgrade(cfg, "0004")
+        assert "feedback" not in set(inspect(engine).get_table_names())
+    finally:
+        engine.dispose()

@@ -10,6 +10,8 @@ Endpoints:
     POST /quiz/{id}/grade   grade one quiz answer against its stored reference
     GET  /courses           list the distinct courses indexed in Qdrant
     GET  /history/{id}      recent conversation turns for a student
+    POST /feedback          record a thumbs up/down on a tutor answer
+    GET  /feedback/summary  thumbs up/down counts for a student
 
 The layer stays thin: each route delegates to the existing grounded functions
 and graph nodes. No retrieval or prompting logic is reimplemented here. The API
@@ -26,8 +28,8 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import Engine, select
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import Engine, func, select
 
 from agent.nodes.generate import generate
 from agent.nodes.grade import grade
@@ -54,7 +56,7 @@ from api.middleware import (
 from core.answer import answer, stream_answer
 from core.config import get_settings
 from core.courses import list_courses
-from db.models import Student
+from db.models import Feedback, Student
 from db.session import (
     add_message,
     configure_session_factory,
@@ -310,6 +312,43 @@ class StudentOut(BaseModel):
     id: int
     external_id: str
     created_at: str
+
+
+class FeedbackRequest(BaseModel):
+    """A student's thumbs up/down on a tutor answer.
+
+    ``rating`` is ``1`` for thumbs up and ``-1`` for thumbs down (validated). The
+    question and answer text are stored verbatim so the feedback is
+    self-contained for later evaluation. ``note`` is optional (e.g. why the
+    answer was unhelpful).
+    """
+
+    student_id: str
+    rating: int = Field(description="1 for thumbs up, -1 for thumbs down.")
+    question: str
+    answer: str
+    note: str | None = None
+
+    @field_validator("rating")
+    @classmethod
+    def _rating_in_range(cls, value: int) -> int:
+        """Reject any rating other than the two allowed values."""
+        if value not in (1, -1):
+            raise ValueError("rating must be 1 (up) or -1 (down).")
+        return value
+
+
+class FeedbackResponse(BaseModel):
+    """The id of the persisted feedback row."""
+
+    id: int
+
+
+class FeedbackSummary(BaseModel):
+    """Aggregate thumbs up/down counts for a student."""
+
+    up: int
+    down: int
 
 
 @app.get("/health")
@@ -624,6 +663,66 @@ def history(student_id: str, limit: int = 20) -> list[dict[str, str]]:
             }
             for row in rows
         ]
+
+
+@app.post(
+    "/feedback",
+    response_model=FeedbackResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_api_key)],
+)
+def submit_feedback(
+    request: FeedbackRequest, user: UserOut | None = OptionalUser
+) -> dict[str, int]:
+    """Persist a student's thumbs up/down on a tutor answer.
+
+    The student is ensured to exist (and linked to the caller when
+    authenticated). The captured question/answer text makes the feedback
+    self-contained so it can later feed offline evaluation. Returns 201 with the
+    new row id; an invalid ``rating`` is rejected with 422 by request
+    validation. This route reaches no LLM and runs no retrieval.
+    """
+    with get_session(_engine) as session:
+        student = _resolve_student(session, request.student_id, user)
+        row = Feedback(
+            student_id=student.id,
+            rating=request.rating,
+            note=request.note,
+            question=request.question,
+            answer=request.answer,
+        )
+        session.add(row)
+        session.flush()
+        feedback_id = row.id
+    return {"id": feedback_id}
+
+
+@app.get(
+    "/feedback/summary",
+    response_model=FeedbackSummary,
+    dependencies=[Depends(require_api_key)],
+)
+def feedback_summary(student_id: str) -> dict[str, int]:
+    """Return thumbs up/down counts for a student.
+
+    An unknown student yields zero counts rather than an error. Useful for a
+    lightweight quality signal without exposing individual feedback rows.
+    """
+    with get_session(_engine) as session:
+        student = session.scalar(select(Student).where(Student.external_id == student_id))
+        if student is None:
+            return {"up": 0, "down": 0}
+        up = session.scalar(
+            select(func.count())
+            .select_from(Feedback)
+            .where(Feedback.student_id == student.id, Feedback.rating == 1)
+        )
+        down = session.scalar(
+            select(func.count())
+            .select_from(Feedback)
+            .where(Feedback.student_id == student.id, Feedback.rating == -1)
+        )
+    return {"up": up or 0, "down": down or 0}
 
 
 if __name__ == "__main__":
