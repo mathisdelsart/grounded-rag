@@ -141,11 +141,19 @@ def _dense_points(
     limit: int,
     score_threshold: float,
     query_filter: Filter | None,
+    using: str | None = None,
 ):
-    """Run the dense-only query against the (unnamed-vector) collection."""
+    """Run the dense-only query.
+
+    ``using`` names the dense vector for collections built with named vectors
+    (sparse-enabled collections have no default vector, so the dense query must
+    name it). It stays None for a plain dense-only collection that stores a
+    single unnamed vector (``using=None`` selects that default vector).
+    """
     response = client.query_points(
         collection_name=collection,
         query=embed_query(question),
+        using=using,
         limit=limit,
         score_threshold=score_threshold,
         query_filter=query_filter,
@@ -217,18 +225,31 @@ def _fetch_candidates(
     query yields no candidates. Reranking is intentionally *not* applied here:
     on the multi-query path it must run once over the fused pool.
     """
-    use_hybrid = settings.hybrid_retrieval and _collection_has_sparse(
+    has_sparse = _collection_has_sparse(
         client, settings.qdrant_collection, settings.sparse_vector_name
     )
-    fetch = _hybrid_points if use_hybrid else _dense_points
-    points = fetch(
-        client,
-        collection=settings.qdrant_collection,
-        question=question,
-        limit=limit,
-        score_threshold=score_threshold,
-        query_filter=query_filter,
-    )
+    if settings.hybrid_retrieval and has_sparse:
+        points = _hybrid_points(
+            client,
+            collection=settings.qdrant_collection,
+            question=question,
+            limit=limit,
+            score_threshold=score_threshold,
+            query_filter=query_filter,
+        )
+    else:
+        # A sparse-enabled collection uses named vectors (no default vector), so
+        # the dense query must name the dense vector; a plain dense-only
+        # collection stores one unnamed vector (using=None).
+        points = _dense_points(
+            client,
+            collection=settings.qdrant_collection,
+            question=question,
+            limit=limit,
+            score_threshold=score_threshold,
+            query_filter=query_filter,
+            using=DENSE_VECTOR_NAME if has_sparse else None,
+        )
     return [_point_to_retrieved(point) for point in points]
 
 
