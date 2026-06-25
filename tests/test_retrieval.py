@@ -330,3 +330,20 @@ def test_hybrid_composes_with_reranker(monkeypatch):
     assert isinstance(kwargs["query"], retrieval.FusionQuery)
     # Reranker widened the prefetch/limit and reordered: bravo wins.
     assert [r.chunk.id for r in results] == ["p2"]
+
+
+def test_dense_query_names_vector_on_named_vector_collection(monkeypatch):
+    # Sparse-enabled (named-vector) collection with hybrid OFF: the dense query
+    # must name the dense vector, else Qdrant rejects it (no default vector).
+    _set_settings(monkeypatch, hybrid_retrieval=False)
+    _FakeQdrantClient.has_sparse = True
+    retrieval.retrieve("q", k=5)
+    assert _FakeQdrantClient.last_kwargs.get("using") == retrieval.DENSE_VECTOR_NAME
+
+
+def test_dense_query_uses_default_vector_on_plain_collection(monkeypatch):
+    # Plain dense-only collection: no named vector, so the default (using=None).
+    _set_settings(monkeypatch, hybrid_retrieval=False)
+    _FakeQdrantClient.has_sparse = False
+    retrieval.retrieve("q", k=5)
+    assert _FakeQdrantClient.last_kwargs.get("using") is None
