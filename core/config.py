@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     qdrant_api_key: str | None = None
     qdrant_collection: str = "courses"
 
+    # Comma-separated CORS origins allowed to call the API from a browser.
+    # Defaults to local dev origins so the `web/` frontend works out of the box
+    # locally; in production set CORS_ORIGINS to the deployed frontend URL
+    # (e.g. the Vercel domain). Empty disables CORS entirely.
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
     # Multilingual embeddings (documents and questions are in French).
     embedding_model: str = "BAAI/bge-m3"
 

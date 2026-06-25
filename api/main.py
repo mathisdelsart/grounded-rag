@@ -34,6 +34,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Engine, func, select
@@ -125,6 +126,23 @@ app = FastAPI(
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestIdMiddleware)
+
+# CORS added last so it is outermost: a browser preflight (OPTIONS) is answered
+# before the auth/rate-limit layers. Allowed origins come from `cors_origins`
+# (comma-separated); an empty value disables CORS. The default permits local dev
+# origins so the `web/` frontend works out of the box; override CORS_ORIGINS in
+# production with the deployed frontend URL.
+_cors_origins = [
+    origin.strip() for origin in get_settings().cors_origins.split(",") if origin.strip()
+]
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 @app.exception_handler(Exception)
