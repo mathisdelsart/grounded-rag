@@ -32,6 +32,15 @@ from agent.nodes.grade import grade
 from agent.nodes.quiz import generate_quiz, grade_quiz_answer
 from agent.nodes.reexplain import reexplain
 from agent.state import Level, TutorState, to_history
+from api.auth import (
+    CurrentUser,
+    LoginRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserOut,
+    login_user,
+    register_user,
+)
 from core.answer import answer, stream_answer
 from core.config import get_settings
 from db.models import Student
@@ -209,6 +218,42 @@ class HistoryItem(BaseModel):
 def health() -> dict[str, str]:
     """Liveness probe."""
     return {"status": "ok"}
+
+
+@app.post(
+    "/auth/register",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def auth_register(request: RegisterRequest) -> UserOut:
+    """Create a new account from an email and password.
+
+    The password is hashed with bcrypt before storage. Returns 201 with the
+    minimal user info on success, 409 when the email is already registered, and
+    422 on invalid input. This route is additive and does not affect the
+    existing endpoints or the ``X-API-Key`` guard.
+    """
+    return register_user(request)
+
+
+@app.post("/auth/login", response_model=TokenResponse)
+def auth_login(request: LoginRequest) -> TokenResponse:
+    """Verify credentials and return a signed bearer access token.
+
+    Returns ``{access_token, token_type}`` on success or 401 on bad credentials
+    (same message for unknown email and wrong password).
+    """
+    return login_user(request)
+
+
+@app.get("/auth/me", response_model=UserOut)
+def auth_me(current_user: UserOut = CurrentUser) -> UserOut:
+    """Return the currently authenticated user.
+
+    Protected by ``get_current_user``: the request must carry a valid
+    ``Authorization: Bearer <jwt>`` header, otherwise 401 is returned.
+    """
+    return current_user
 
 
 @app.post("/ask", response_model=AskResponse, dependencies=[Depends(require_api_key)])

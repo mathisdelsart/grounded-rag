@@ -18,6 +18,23 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
+class User(Base):
+    """A registered account that can authenticate with email and password.
+
+    The password is never stored in clear text: only its bcrypt hash is kept.
+    This table is additive and independent of ``Student`` (the anonymous,
+    ``external_id``-keyed identity used by the tutor endpoints); the two are not
+    linked, so existing flows are unaffected.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Student(Base):
     """A user revising their courses."""
 

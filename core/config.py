@@ -84,6 +84,17 @@ class Settings(BaseSettings):
     # mutating endpoints and `/history`. `/health` is always open.
     api_key: str = ""
 
+    # Secret used to sign user JWTs (HS256). The default is an insecure
+    # placeholder for local development only and MUST be overridden in
+    # production via `JWT_SECRET` (or `.env`); leaking it lets anyone forge a
+    # valid access token. User authentication is additive and independent of
+    # `api_key` above; the two guards coexist.
+    jwt_secret: str = "dev-insecure-change-me"
+
+    # Lifetime of an issued access token, in minutes. After it elapses the token
+    # is rejected and the user must log in again.
+    jwt_expire_minutes: int = 60
+
     # Global LLM provider switch for fully local, zero-cost runs. "" keeps the
     # default OpenAI provider; "ollama" routes every role to a local Ollama chat
     # model (see `get_llm`). Per-role `LLM_<ROLE>` values may still carry their

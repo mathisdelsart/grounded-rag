@@ -27,6 +27,9 @@ api = [
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0",
     "pydantic>=2.13",
+    # User authentication: bcrypt password hashing + JWT (HS256) access tokens.
+    "bcrypt>=4.0",
+    "pyjwt>=2.8",
 ]
 obs = [
     "langfuse>=2.0",
