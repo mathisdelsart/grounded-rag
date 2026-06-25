@@ -89,6 +89,23 @@ even though the API is healthy. Two zero-cost ways to confirm/work around it:
   origin on the API (CORS middleware) and restart it — the frontend code itself
   needs no change.
 
+## Troubleshooting
+
+**`/ask` or registering returns a 500 with `no such column` / `no such table`**
+in the API logs (e.g. `no such column: students.user_id`, or a missing
+`users` / `sessions` / `reviews` table). Your local `app.db` predates a schema
+change. The API's startup uses SQLAlchemy `create_all`, which adds missing
+tables but never alters existing ones, so the dev DB must be reset (or migrated)
+after a model or migration change. Fix it with either:
+
+```sh
+make reset-db                                   # delete app.db, recreated on next start
+# or, to migrate in place instead of wiping data:
+uv run --extra migrations alembic upgrade head
+```
+
+Then restart the API.
+
 ## 30-second smoke checklist
 
 1. Open `http://localhost:3000` — the health badge in the header turns **green**.

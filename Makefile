@@ -7,7 +7,7 @@ SHELL := /bin/sh
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install local-install local qdrant hooks lint fmt fmt-check test check api ui web dev eval eval-report ingest ask up down clean
+.PHONY: help install local-install local qdrant hooks lint fmt fmt-check test check api ui web dev eval eval-report ingest ask up down clean reset-db
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Available targets:\n"} \
@@ -100,3 +100,11 @@ down: ## Stop all services
 clean: ## Remove local caches (ruff, pytest, __pycache__)
 	rm -rf .ruff_cache .pytest_cache
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+
+# Delete the local SQLite dev database so it is recreated with the current
+# schema on the next API start. Use this after a model/migration change when
+# the stale app.db triggers "no such column"/"no such table" errors. Only
+# touches the local sqlite file and its WAL/SHM sidecars; nothing else.
+reset-db: ## Remove the local SQLite dev DB (recreated on next API start)
+	rm -f app.db app.db-wal app.db-shm
+	@echo "removed local app.db — it will be recreated on the next API start"
