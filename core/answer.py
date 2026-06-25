@@ -9,9 +9,9 @@ the question is refused rather than answered from the model's own knowledge.
 import re
 from collections.abc import Iterator
 
-from core.config import get_llm
+from core.config import get_llm, get_settings
 from core.obs import get_callbacks, timer
-from core.retrieval import retrieve
+from core.retrieval import retrieve, retrieve_multi
 from ingestion.schema import Retrieved, format_numbered_sources
 
 REFUSAL = "This is not covered in the course material."
@@ -35,6 +35,19 @@ def _remap_citations(text: str, results: list[Retrieved]) -> str:
         return match.group(0)
 
     return re.sub(r"\[(\d+)\]", repl, text)
+
+
+def _retrieve(question: str, *, k: int, course: str | None, chapter: str | None) -> list[Retrieved]:
+    """Dispatch to single- or multi-query retrieval based on settings.
+
+    With ``multi_query`` off (the default) this calls :func:`retrieve` exactly
+    as before, so the default path is unchanged. With it on, the question is
+    expanded and the fused result is used; the threshold/refusal and reranker
+    behave identically either way.
+    """
+    if get_settings().multi_query:
+        return retrieve_multi(question, k=k, course=course, chapter=chapter)
+    return retrieve(question, k=k, course=course, chapter=chapter)
 
 
 def _cited_indices(text: str, count: int) -> list[int]:
@@ -68,7 +81,7 @@ def answer(
     (and chapter); when both are None the whole collection is searched.
     """
     with timer("retrieval"):
-        results = retrieve(question, k=k, course=course, chapter=chapter)
+        results = _retrieve(question, k=k, course=course, chapter=chapter)
     if not results:
         return {"answer": REFUSAL, "refused": True, "sources": [], "raw": REFUSAL, "retrieved": []}
 
@@ -124,7 +137,7 @@ def stream_answer(
     emitted with ``refused=True`` and no sources.
     """
     with timer("retrieval"):
-        results = retrieve(question, k=k, course=course, chapter=chapter)
+        results = _retrieve(question, k=k, course=course, chapter=chapter)
     if not results:
         yield {"type": "token", "text": REFUSAL}
         yield {"type": "sources", "sources": [], "refused": True, "answer": REFUSAL}

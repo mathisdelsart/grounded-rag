@@ -36,6 +36,7 @@ from qdrant_client.models import (
 )
 
 from core.config import get_settings
+from core.query import expand_query
 from ingestion.embed import embed_query
 from ingestion.index import DENSE_VECTOR_NAME
 from ingestion.schema import Chunk, Retrieved
@@ -199,6 +200,57 @@ def _hybrid_points(
     return response.points
 
 
+def _fetch_candidates(
+    client: QdrantClient,
+    *,
+    settings,
+    question: str,
+    limit: int,
+    score_threshold: float,
+    query_filter: Filter | None,
+) -> list[Retrieved]:
+    """Fetch threshold-filtered candidates for one query (dense or hybrid).
+
+    Chooses the hybrid RRF path when ``hybrid_retrieval`` is set and the
+    collection carries the sparse vector, otherwise the plain dense path. In
+    both cases the dense similarity threshold pre-filters, so an out-of-course
+    query yields no candidates. Reranking is intentionally *not* applied here:
+    on the multi-query path it must run once over the fused pool.
+    """
+    use_hybrid = settings.hybrid_retrieval and _collection_has_sparse(
+        client, settings.qdrant_collection, settings.sparse_vector_name
+    )
+    fetch = _hybrid_points if use_hybrid else _dense_points
+    points = fetch(
+        client,
+        collection=settings.qdrant_collection,
+        question=question,
+        limit=limit,
+        score_threshold=score_threshold,
+        query_filter=query_filter,
+    )
+    return [_point_to_retrieved(point) for point in points]
+
+
+def _fuse(candidate_lists: list[list[Retrieved]]) -> list[Retrieved]:
+    """Fuse per-query candidate lists by chunk id, keeping the best score.
+
+    De-duplicates across sub-queries: a chunk surfaced by several rewrites is
+    kept once, with its highest similarity score, and the fused pool is sorted
+    by score (best first). This preserves the score semantics the threshold and
+    reranker downstream expect, while widening coverage across rewrites.
+    """
+    best: dict[str, Retrieved] = {}
+    for candidates in candidate_lists:
+        for cand in candidates:
+            current = best.get(cand.chunk.id)
+            if current is None or cand.score > current.score:
+                best[cand.chunk.id] = cand
+    fused = list(best.values())
+    fused.sort(key=lambda r: r.score, reverse=True)
+    return fused
+
+
 def retrieve(
     question: str,
     *,
@@ -243,29 +295,72 @@ def retrieve(
     else:
         limit = k
 
-    use_hybrid = settings.hybrid_retrieval and _collection_has_sparse(
-        client, settings.qdrant_collection, settings.sparse_vector_name
+    candidates = _fetch_candidates(
+        client,
+        settings=settings,
+        question=question,
+        limit=limit,
+        score_threshold=score_threshold,
+        query_filter=query_filter,
     )
-    if use_hybrid:
-        points = _hybrid_points(
-            client,
-            collection=settings.qdrant_collection,
-            question=question,
-            limit=limit,
-            score_threshold=score_threshold,
-            query_filter=query_filter,
-        )
-    else:
-        points = _dense_points(
-            client,
-            collection=settings.qdrant_collection,
-            question=question,
-            limit=limit,
-            score_threshold=score_threshold,
-            query_filter=query_filter,
-        )
-
-    candidates = [_point_to_retrieved(point) for point in points]
     if reranking:
         return rerank(question, candidates, k=k, scorer=scorer or _default_scorer)
     return candidates
+
+
+def retrieve_multi(
+    question: str,
+    *,
+    k: int = 5,
+    course: str | None = None,
+    chapter: str | None = None,
+    scorer: Scorer | None = None,
+) -> list[Retrieved]:
+    """Multi-query retrieval: expand the question, retrieve per query, then fuse.
+
+    The question is rewritten into a few diverse sub-queries (see
+    ``core.query.expand_query``); ``retrieve`` runs for each, and the candidate
+    lists are fused by chunk id keeping the best score. The SAME machinery as
+    the single-query path is preserved:
+
+    - Every sub-query is fetched with the dense similarity threshold, so an
+      out-of-course question contributes nothing from any rewrite and the fused
+      pool is empty -> the answer layer refuses. Multi-query only widens recall;
+      it never relaxes the refusal guard.
+    - The optional cross-encoder reranker, when configured, runs once over the
+      fused pool and truncates to k, exactly as in the single-query path.
+    - When the reranker is off, the fused pool is sorted by similarity and
+      truncated to k.
+
+    With ``multi_query`` disabled this wrapper is never reached; the default
+    callers keep using :func:`retrieve` unchanged.
+    """
+    settings = get_settings()
+    queries = expand_query(question, n=settings.multi_query_n)
+
+    client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
+    query_filter = _build_filter(course, chapter)
+
+    reranking = bool(settings.reranker_model)
+    score_threshold = settings.similarity_threshold
+    # Each sub-query fetches enough room for fusion/reranking to choose from.
+    per_query_limit = max(settings.rerank_candidates, k) if reranking else k
+
+    candidate_lists = [
+        _fetch_candidates(
+            client,
+            settings=settings,
+            question=q,
+            limit=per_query_limit,
+            score_threshold=score_threshold,
+            query_filter=query_filter,
+        )
+        for q in queries
+    ]
+    fused = _fuse(candidate_lists)
+
+    if reranking:
+        # Rerank against the original question, not a rewrite, so relevance is
+        # judged on what the student actually asked.
+        return rerank(question, fused, k=k, scorer=scorer or _default_scorer)
+    return fused[:k]
