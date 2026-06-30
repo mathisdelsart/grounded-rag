@@ -43,10 +43,12 @@ export function AskPanel({
 }: AskPanelProps) {
   const toast = useToast();
   const { t } = useT();
-  const [question, setQuestion] = useState("");
+  // Pre-filled with the same simple example shown in the hero, so the tool is
+  // immediately understandable; the user can clear it and ask their own.
+  const [question, setQuestion] = useState(() => t("ask.example.question"));
   // Lazy-init from localStorage so the last chosen course survives a reload.
-  const [course, setCourse] = useState(() => readLocal(KEYS.course));
-  const [chapter, setChapter] = useState("");
+  const [course, setCourse] = useState(() => readLocal(KEYS.course) || t("ask.example.course"));
+  const [chapter, setChapter] = useState(() => t("ask.example.chapter"));
   const [k, setK] = useState(5);
   const [loading, setLoading] = useState(false);
   /** Text accumulated from the live token stream, before the final event lands. */

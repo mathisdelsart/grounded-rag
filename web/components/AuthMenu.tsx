@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { login, me, register, type AuthUser, type ConnectionConfig } from "@/lib/api";
 import { Button } from "@/components/Button";
 import { TextField } from "@/components/TextField";
@@ -27,7 +27,30 @@ export function AuthMenu({ config, email, onLogin, onLogout }: AuthMenuProps) {
   const toast = useToast();
   const { t } = useT();
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [mode, setMode] = useState<Mode>("login");
+
+  // While open, close on Escape or an outside click, returning focus to the
+  // trigger so keyboard users are never stranded inside a dismissed dialog.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    function onClick(e: MouseEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onClick);
+    };
+  }, [open]);
   const [emailInput, setEmailInput] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -70,27 +93,25 @@ export function AuthMenu({ config, email, onLogin, onLogout }: AuthMenuProps) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
+        ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="dialog"
         className={cn(
-          "inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5",
-          "text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50",
-          "dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-950",
+          "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2",
+          isAuthed
+            ? "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+            : "bg-brand-600 text-white shadow-sm shadow-brand-600/20 hover:bg-brand-500 active:bg-brand-700",
         )}
       >
-        <span
-          className={cn(
-            "h-2 w-2 rounded-full",
-            isAuthed ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-600",
-          )}
-          aria-hidden
-        />
         {isAuthed ? (
-          <span className="max-w-[12rem] truncate">{email}</span>
+          <>
+            <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+            <span className="max-w-[12rem] truncate">{email}</span>
+          </>
         ) : (
           <span>{t("header.signIn")}</span>
         )}

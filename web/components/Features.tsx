@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n";
 import { SectionIntro } from "@/components/SectionIntro";
+import { Reveal } from "@/components/Reveal";
 
 function QuoteIcon() {
   return (
@@ -70,19 +71,8 @@ interface Feature {
   body: TranslationKey;
   /** Bento span — the highlighted tile is wider/taller than the rest. */
   span: string;
-  /** A faint brand corner gradient + inline detail to break the icon+text rhythm. */
+  /** A faint brand corner gradient to break the icon+text rhythm. */
   accent?: boolean;
-  /** Which inline detail to render under the body, if any. */
-  detail?: "guard" | "pipeline";
-}
-
-/** Small pill used as an inline detail inside accented tiles. */
-function Pill({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
-      {children}
-    </span>
-  );
 }
 
 /** Secondary tiles — the highlighted "cited" tile is rendered separately. */
@@ -93,7 +83,6 @@ const FEATURES: Feature[] = [
     body: "features.refusal.body",
     span: "lg:col-span-3",
     accent: true,
-    detail: "guard",
   },
   {
     icon: <SearchIcon />,
@@ -101,7 +90,6 @@ const FEATURES: Feature[] = [
     body: "features.retrieval.body",
     span: "lg:col-span-3",
     accent: true,
-    detail: "pipeline",
   },
   {
     icon: <LockIcon />,
@@ -125,124 +113,82 @@ const FEATURES: Feature[] = [
 ];
 
 const TILE =
-  "relative flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900";
+  "relative flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg";
 
-/** Inline detail rendered under an accented tile's body. */
-function FeatureDetail({ kind }: { kind: "guard" | "pipeline" }) {
-  const { t } = useT();
-  if (kind === "guard") {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Pill>
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand-500 dark:bg-brand-400" />
-          {t("features.refusal.pill.threshold")}
-        </Pill>
-        <Pill>
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          {t("features.refusal.pill.faithfulness")}
-        </Pill>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Pill>dense</Pill>
-      <span aria-hidden className="text-zinc-300 dark:text-zinc-600">
-        +
-      </span>
-      <Pill>BM25</Pill>
-      <span aria-hidden className="text-zinc-300 dark:text-zinc-600">
-        →
-      </span>
-      <Pill>reranker</Pill>
-    </div>
-  );
-}
-
-/** A bento grid of the product's real differentiators. */
+/** A bento grid of the product's real benefits. */
 export function Features() {
   const { t } = useT();
   return (
     <section id="features" aria-labelledby="features-heading" className="scroll-mt-24 py-4">
-      <SectionIntro
-        eyebrow="features.eyebrow"
-        title="features.title"
-        subtitle="features.subtitle"
-        headingId="features-heading"
-      />
+      <Reveal>
+        <SectionIntro
+          eyebrow="features.eyebrow"
+          title="features.title"
+          subtitle="features.subtitle"
+          headingId="features-heading"
+        />
+      </Reveal>
 
       <ul className="mt-12 grid auto-rows-fr gap-5 sm:grid-cols-2 lg:grid-cols-6">
         {/* Highlighted lead tile: cited by construction, with a mini visual. */}
-        <li className="lg:col-span-3 lg:row-span-2">
-          <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-7 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-brand-900/60 dark:from-brand-950/40 dark:to-zinc-900">
+        <Reveal as="li" className="lg:col-span-3 lg:row-span-2">
+          <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-7 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
             <div
               aria-hidden
-              className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-500/10 blur-2xl dark:bg-brand-400/10"
+              className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand-500/10 blur-2xl"
             />
             <div className="relative">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500/15 text-brand-600 dark:bg-brand-400/20 dark:text-brand-300">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500/15 text-brand-600 transition group-hover:scale-110">
                 <QuoteIcon />
               </span>
-              <h3 className="mt-5 text-lg font-semibold text-ink dark:text-zinc-100">
-                {t("features.cited.title")}
-              </h3>
-              <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+              <h3 className="mt-5 text-lg font-semibold text-ink">{t("features.cited.title")}</h3>
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-600">
                 {t("features.cited.body")}
               </p>
             </div>
 
             {/* Mini visual: an answer fragment carrying a periwinkle citation chip. */}
             <div className="relative mt-auto pt-6">
-              <div className="rounded-xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur transition-shadow group-hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900/70">
-                <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+              <div className="rounded-xl border border-zinc-200 bg-white/80 p-4 shadow-sm backdrop-blur transition-shadow group-hover:shadow-md">
+                <p className="text-sm leading-relaxed text-zinc-700">
                   {t("features.cited.demo.answer")}
                   {/* Caret hinting at streamed tokens — mirrors the hero. */}
                   <span
                     aria-hidden
-                    className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse rounded-sm bg-brand-500 align-baseline dark:bg-brand-400"
+                    className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse rounded-sm bg-brand-500 align-baseline"
                   />
                 </p>
                 <div className="mt-3">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-950 dark:text-brand-300">
-                    <span
-                      aria-hidden
-                      className="h-1.5 w-1.5 rounded-full bg-brand-500 dark:bg-brand-400"
-                    />
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand-500" />
                     {t("features.cited.demo.chip")}
                   </span>
                 </div>
               </div>
             </div>
           </div>
-        </li>
+        </Reveal>
 
         {/* Remaining tiles in varied spans. */}
-        {FEATURES.map((feature) => (
-          <li key={feature.title} className={feature.span}>
+        {FEATURES.map((feature, i) => (
+          <Reveal as="li" key={feature.title} delay={(i + 1) * 80} className={feature.span}>
             <div className={`${TILE} group`}>
               {/* Accented tiles get a faint brand corner gradient. */}
               {feature.accent && (
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-brand-500/10 blur-2xl dark:bg-brand-400/10"
+                  className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-brand-500/10 blur-2xl"
                 />
               )}
-              <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:bg-brand-400/15 dark:text-brand-300">
+              <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 transition group-hover:scale-110">
                 {feature.icon}
               </span>
-              <h3 className="relative mt-5 font-semibold text-ink dark:text-zinc-100">
-                {t(feature.title)}
-              </h3>
-              <p className="relative mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+              <h3 className="relative mt-5 font-semibold text-ink">{t(feature.title)}</h3>
+              <p className="relative mt-2 text-sm leading-relaxed text-zinc-600">
                 {t(feature.body)}
               </p>
-              {feature.detail && (
-                <div className="relative mt-auto pt-4">
-                  <FeatureDetail kind={feature.detail} />
-                </div>
-              )}
             </div>
-          </li>
+          </Reveal>
         ))}
       </ul>
     </section>

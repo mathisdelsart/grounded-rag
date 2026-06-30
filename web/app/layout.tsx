@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
@@ -10,30 +10,40 @@ const inter = Inter({
   display: "swap",
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://sourcio.app";
+const DESCRIPTION =
+  "An AI tutor that answers strictly from your own courses — every answer cited to its source, or honestly refused when the course doesn't cover it.";
+
 export const metadata: Metadata = {
-  title: "Grounded Tutor",
-  description:
-    "A course tutor that answers strictly from your material, with citations.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Sourcio — cited answers from your own courses",
+    template: "%s · Sourcio",
+  },
+  description: DESCRIPTION,
+  applicationName: "Sourcio",
+  keywords: ["AI tutor", "cited answers", "study from your courses", "no hallucination", "revision"],
+  authors: [{ name: "mathisdelsart" }],
+  openGraph: {
+    type: "website",
+    siteName: "Sourcio",
+    title: "Sourcio — cited answers from your own courses",
+    description: DESCRIPTION,
+    url: SITE_URL,
+  },
+  twitter: {
+    card: "summary",
+    title: "Sourcio",
+    description: DESCRIPTION,
+  },
 };
 
-/**
- * Runs before first paint to set the initial theme class on <html>, avoiding a
- * flash of the wrong theme. Reads the persisted preference, falling back to the
- * OS `prefers-color-scheme` when none has been chosen yet.
- */
-const themeInitScript = `
-(function () {
-  try {
-    var stored = localStorage.getItem("grounded-rag:theme");
-    var dark = stored
-      ? stored === "dark"
-      : window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var root = document.documentElement;
-    root.classList.toggle("dark", dark);
-    root.style.colorScheme = dark ? "dark" : "light";
-  } catch (e) {}
-})();
-`;
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#15172e" },
+  ],
+};
 
 export default function RootLayout({
   children,
@@ -41,10 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
+    <html lang="en" className={inter.variable}>
       <body className="font-sans antialiased">
         <I18nProvider>
           <ToastProvider>{children}</ToastProvider>

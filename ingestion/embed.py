@@ -86,8 +86,12 @@ def embedding_dim() -> int:
     model = _model()
     # Method was renamed in recent sentence-transformers; support both.
     if hasattr(model, "get_embedding_dimension"):
-        return model.get_embedding_dimension()
-    return model.get_sentence_embedding_dimension()
+        dim = model.get_embedding_dimension()
+    else:
+        dim = model.get_sentence_embedding_dimension()
+    if dim is None:
+        raise RuntimeError("Embedding model did not report a vector dimension.")
+    return dim
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:

@@ -6,7 +6,7 @@ import { KEYS, generateStudentId, readLocal, writeLocal } from "@/lib/storage";
 import { Tabs, type TabItem } from "@/components/Tabs";
 import { HealthBadge } from "@/components/HealthBadge";
 import { AuthMenu } from "@/components/AuthMenu";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { BrandMark } from "@/components/Logo";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useT } from "@/lib/i18n";
 import { scrollToId } from "@/lib/scroll";
@@ -15,6 +15,7 @@ import { HowItWorks } from "@/components/HowItWorks";
 import { Features } from "@/components/Features";
 import { StatsBand } from "@/components/StatsBand";
 import { LandingCta } from "@/components/LandingCta";
+import { Reveal } from "@/components/Reveal";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { AskPanel } from "@/components/panels/AskPanel";
 import { ReexplainPanel } from "@/components/panels/ReexplainPanel";
@@ -116,54 +117,72 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-sm font-bold text-white dark:bg-white dark:text-ink">
-              G
-            </div>
+    <div className="min-h-screen bg-zinc-50">
+      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="flex items-center gap-3">
+            <BrandMark className="h-10 w-10" />
             <div className="leading-tight">
-              <p className="text-sm font-semibold text-ink dark:text-zinc-100">
-                {t("app.name")}
-              </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {t("app.tagline")}
-              </p>
+              <p className="text-sm font-semibold text-ink">{t("app.name")}</p>
+              <p className="text-xs text-zinc-500">{t("app.tagline")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="hidden sm:inline-flex">
-              <HealthBadge config={config} />
-            </span>
-            <AuthMenu
-              config={config}
-              email={authEmail || null}
-              onLogin={onLogin}
-              onLogout={onLogout}
-            />
-            <LanguageToggle />
-            <ThemeToggle />
-          </div>
+
+          {/* Primary nav — smooth-scrolls to the landing sections (desktop only). */}
+          <nav aria-label={t("footer.explore")} className="hidden items-center gap-8 md:flex">
+            {(
+              [
+                ["how", "footer.link.how"],
+                ["features", "footer.link.features"],
+                ["tool", "footer.link.tool"],
+              ] as const
+            ).map(([target, key]) => (
+              <button
+                key={target}
+                type="button"
+                onClick={() => scrollToId(target)}
+                className="rounded text-sm font-medium text-zinc-600 transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+              >
+                {t(key)}
+              </button>
+            ))}
+          </nav>
+
+          {/* Language + sign-in are direct flex children, so `justify-between`
+              spreads logo · nav · language · sign-in with equal gaps between
+              each — generous breathing room on both sides of the language. */}
+          <LanguageToggle />
+          <AuthMenu
+            config={config}
+            email={authEmail || null}
+            onLogin={onLogin}
+            onLogout={onLogout}
+          />
         </div>
       </header>
 
       <main>
-        {/* Landing — wide, confident container with generous section padding.
-            The hero leads into a full-width navy stats band, then the rest of
-            the landing resumes inside the centered column. */}
-        <div className="mx-auto max-w-6xl px-4 pt-20 sm:px-6 sm:pt-28">
-          <Hero targetId="tool" />
+        {/* Landing — wide, confident container. The hero leads into a full-width
+            navy stats band, then the rest of the landing resumes inside the
+            centered column. */}
+        <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
+          <Reveal>
+            <Hero targetId="tool" />
+          </Reveal>
         </div>
 
         <div className="mt-20 sm:mt-28">
-          <StatsBand />
+          <Reveal>
+            <StatsBand />
+          </Reveal>
         </div>
 
         <div className="mx-auto max-w-6xl space-y-24 px-4 py-20 sm:px-6 sm:py-28">
           <HowItWorks />
           <Features />
-          <LandingCta targetId="tool" />
+          <Reveal>
+            <LandingCta targetId="tool" />
+          </Reveal>
         </div>
 
         {/* Tool — the existing tutor, anchored so the hero CTA scrolls here.
@@ -171,23 +190,19 @@ export default function Home() {
         <section
           id="tool"
           aria-label={t("tabs.aria")}
-          className="scroll-mt-20 border-t border-zinc-200 bg-[#f6f6f3] dark:border-zinc-800 dark:bg-zinc-900"
+          className="scroll-mt-20 border-t border-zinc-200 bg-paper dark:border-zinc-800 dark:bg-zinc-900"
         >
           <div className="mx-auto max-w-4xl px-4 py-20 sm:px-6 sm:py-28">
-            <div className="flex justify-center sm:hidden">
-              <HealthBadge config={config} />
-            </div>
-
             {/* App window: browser chrome (dots + URL pill) + framed body, so the
                 tool reads as a live product demo. */}
-            <div className="mt-2 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-card dark:border-zinc-800 dark:bg-zinc-950">
-              <div className="flex items-center gap-3 border-b border-zinc-200 bg-zinc-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/60">
+            <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-card">
+              <div className="flex items-center gap-3 border-b border-zinc-200 bg-zinc-50/80 px-4 py-3">
                 <div className="flex items-center gap-1.5" aria-hidden>
-                  <span className="h-2.5 w-2.5 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                  <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
+                  <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
+                  <span className="h-3 w-3 rounded-full bg-[#28c840]" />
                 </div>
-                <span className="mx-auto flex max-w-[18rem] flex-1 items-center justify-center gap-1.5 truncate rounded-md border border-zinc-200 bg-white px-3 py-1 text-[11px] font-medium text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+                <span className="mx-auto flex max-w-[18rem] flex-1 items-center justify-center gap-1.5 truncate rounded-md border border-zinc-200 bg-white px-3 py-1 text-[11px] font-medium text-zinc-500">
                   <svg
                     aria-hidden
                     viewBox="0 0 24 24"
@@ -201,10 +216,10 @@ export default function Home() {
                     <rect x="5" y="11" width="14" height="9" rx="2" />
                     <path d="M8 11V8a4 4 0 0 1 8 0v3" />
                   </svg>
-                  localhost:3000
+                  sourcio.app
                 </span>
                 {/* Spacer balances the traffic-light dots so the pill stays centered. */}
-                <span aria-hidden className="w-[42px]" />
+                <span aria-hidden className="w-[52px]" />
               </div>
 
               <div className="space-y-6 p-6 sm:p-8">
@@ -217,7 +232,15 @@ export default function Home() {
 
                 <Tabs tabs={TABS} active={active} onChange={setActive} />
 
-                <div className="animate-fade-in">
+                {/* `key={active}` remounts the panel on every tab switch so the
+                    fade-in replays, not just on first render. */}
+                <div
+                  key={active}
+                  id={`tabpanel-${active}`}
+                  role="tabpanel"
+                  aria-labelledby={`tab-${active}`}
+                  className="animate-fade-in"
+                >
                   {active === "ask" && (
                     <AskPanel
                       studentId={studentId}
@@ -272,25 +295,22 @@ export default function Home() {
         </section>
 
         <footer className="bg-navy text-zinc-300">
-          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
+          <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-14 sm:flex-row sm:justify-between sm:px-6">
             {/* Brand mark + tagline. */}
-            <div className="lg:col-span-2 lg:max-w-md">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-xs font-bold text-ink">
-                  G
-                </span>
-                <span className="text-sm font-semibold text-white">{t("app.name")}</span>
+            <div className="sm:max-w-md">
+              <div className="flex items-center gap-2.5">
+                <BrandMark className="h-9 w-9" />
+                <span className="text-base font-semibold text-white">{t("app.name")}</span>
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+              <p className="mt-4 text-sm leading-relaxed text-zinc-400">
                 {t("landing.footer.tagline")}
               </p>
             </div>
 
-            {/* Section links — smooth-scroll to the page sections / tool. */}
-            <nav aria-label={t("footer.explore")}>
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                {t("footer.explore")}
-              </p>
+            {/* Section links — smooth-scroll to the page sections / tool. Right-
+                aligned so the block sits directly above the status line below. */}
+            <nav aria-label={t("footer.explore")} className="sm:text-right">
+              <p className="text-sm font-semibold text-white">{t("footer.explore")}</p>
               <ul className="mt-4 space-y-2.5 text-sm">
                 {(
                   [
@@ -314,9 +334,10 @@ export default function Home() {
           </div>
 
           <div className="border-t border-white/10">
-            <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-5 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <p>{t("footer.tagline")}</p>
+            <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <p>{t("footer.credit")}</p>
+              {/* Discreet backend status — to be removed once a public API is live. */}
+              <HealthBadge config={config} variant="bare" />
             </div>
           </div>
         </footer>

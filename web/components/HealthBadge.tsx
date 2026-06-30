@@ -7,8 +7,18 @@ import { cn } from "@/lib/cn";
 
 type Status = "checking" | "online" | "offline";
 
-/** Persistent badge that polls `/health` and shows a green/red status dot. */
-export function HealthBadge({ config }: { config: ConnectionConfig }) {
+/**
+ * Persistent badge that polls `/health` and shows a green/red status dot.
+ * `variant="bare"` drops the pill chrome for discreet placement on dark
+ * surfaces (e.g. the footer).
+ */
+export function HealthBadge({
+  config,
+  variant = "pill",
+}: {
+  config: ConnectionConfig;
+  variant?: "pill" | "bare";
+}) {
   const { t } = useT();
   const [status, setStatus] = useState<Status>("checking");
   const configRef = useRef(config);
@@ -36,15 +46,16 @@ export function HealthBadge({ config }: { config: ConnectionConfig }) {
         ? t("health.offline")
         : t("health.checking");
   const dot =
-    status === "online"
-      ? "bg-emerald-500"
-      : status === "offline"
-        ? "bg-red-500"
-        : "bg-zinc-300 dark:bg-zinc-600";
+    status === "online" ? "bg-emerald-500" : status === "offline" ? "bg-red-500" : "bg-zinc-400";
 
   return (
     <span
-      className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
+      className={cn(
+        "inline-flex items-center gap-2 text-xs font-medium",
+        variant === "pill"
+          ? "rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-zinc-600"
+          : "text-zinc-500",
+      )}
       title={label}
     >
       <span className="relative flex h-2 w-2">
