@@ -129,6 +129,8 @@ const en = {
   "tabs.threads": "Threads",
   "tabs.history": "History",
   "tabs.review": "Review",
+  // Documents
+  "tabs.documents": "Documents",
 
   // Health badge
   "health.online": "Backend online",
@@ -241,7 +243,7 @@ const en = {
   "exercise.empty.title": "No exercise yet",
   "exercise.empty.description": "Enter a notion above to generate a course-grounded problem.",
   "exercise.solveHint":
-    "Solve it, then head to the Grade tab — your answer is linked to this exercise.",
+    "Solve it, then grade your answer just below — it is linked to this exercise.",
 
   // Grade panel
   "grade.title": "Correct your answer",
@@ -273,14 +275,20 @@ const en = {
   "quiz.answerPlaceholder": "Write your solution here…",
   "quiz.gradeAnswer": "Grade answer",
   "quiz.score": "Score",
+  "quiz.gradeAll": "Grade all",
+  "quiz.finalScore": "Final score",
+  "quiz.recommendationTitle": "Recommendation",
 
   // History panel
   "history.title": "Conversation history",
-  "history.description": "Your recent turns with the tutor, oldest first.",
+  "history.description": "Your turns with the tutor, grouped by thread.",
   "history.refresh": "Refresh",
   "history.empty.title": "No history yet",
   "history.empty.description":
     "Ask a question or generate an exercise — your turns will appear here.",
+  "history.unthreaded": "Unthreaded",
+  "history.unthreadedHint": "Turns not attached to any thread.",
+  "history.turnCount": "{count} messages",
 
   // Threads (conversation sessions)
   "threads.title": "Conversation threads",
@@ -338,6 +346,8 @@ const en = {
   "review.empty.title": "Nothing due — well done.",
   "review.empty.description":
     "You're all caught up. Add a notion above to start tracking it.",
+  "review.helper":
+    "Spaced repetition shows each notion just before you would forget it. Rate your recall (Again, Hard, Good, Easy) and it is rescheduled for the optimal time.",
 
   // Export actions
   "export.copy": "Copy as Markdown",
@@ -348,6 +358,42 @@ const en = {
   "export.copyFailed": "Could not copy to clipboard.",
   "export.downloadStarted": "Download started.",
   "export.downloadFailed": "Could not prepare the download.",
+
+  // Documents
+  "doc.upload.title": "Add course material",
+  "doc.upload.description":
+    "Upload a PDF, Markdown or text file. It is indexed and becomes searchable in the tutor.",
+  "doc.upload.file": "File",
+  "doc.upload.fileHint": "PDF, Markdown (.md) or text (.txt).",
+  "doc.upload.course": "Course",
+  "doc.upload.coursePlaceholder": "e.g. Wavelet Transform",
+  "doc.upload.chapter": "Chapter (optional)",
+  "doc.upload.chapterHint": "Groups the material; leave empty for none.",
+  "doc.upload.chapterPlaceholder": "e.g. Chapter 1",
+  "doc.upload.button": "Upload & index",
+  "doc.upload.success": "Indexed {pages} page(s) into “{course}”.",
+  "doc.library.title": "Indexed material",
+  "doc.library.description": "Everything currently searchable, by course and chapter.",
+  "doc.refresh": "Refresh",
+  "doc.empty.title": "Nothing indexed yet.",
+  "doc.empty.description": "Upload a file above to make it searchable in the tutor.",
+  "doc.pageCount": "{count} page(s)",
+  "doc.uncategorized": "Uncategorized",
+  "doc.delete.course": "Delete course",
+  "doc.delete.chapter": "Delete",
+  "doc.delete.confirm": "Delete “{target}” from the index? This cannot be undone.",
+  "doc.delete.success": "Removed {count} item(s) from “{target}”.",
+  "doc.progress.starting": "Preparing…",
+  "doc.progress.pages": "{done} / {total} pages",
+  "doc.progress.elapsed": "Elapsed {time}",
+  "doc.progress.eta": "~{time} left",
+  "doc.progress.skipped": "{count} already indexed",
+  "doc.progress.done": "Done — {indexed} pages indexed.",
+  "doc.progress.error": "Import failed: {message}",
+  "doc.upToDate": "Up to date",
+  "doc.viewFailed": "Could not open the file.",
+  "doc.delete.confirmShort": "Delete?",
+  "doc.delete.confirmYes": "Yes, delete",
 
   // Misc
   "common.loading": "Loading",
@@ -472,6 +518,8 @@ const fr: Record<TranslationKey, string> = {
   "tabs.threads": "Fils",
   "tabs.history": "Historique",
   "tabs.review": "Révision",
+  // Documents
+  "tabs.documents": "Documents",
 
   // Health badge
   "health.online": "Backend en ligne",
@@ -590,7 +638,7 @@ const fr: Record<TranslationKey, string> = {
   "exercise.empty.description":
     "Saisissez une notion ci-dessus pour générer un problème ancré dans le cours.",
   "exercise.solveHint":
-    "Résolvez-le, puis allez à l'onglet Corriger — votre réponse est liée à cet exercice.",
+    "Résolvez-le, puis corrigez votre réponse juste en dessous — elle est liée à cet exercice.",
 
   // Grade panel
   "grade.title": "Corriger votre réponse",
@@ -624,14 +672,20 @@ const fr: Record<TranslationKey, string> = {
   "quiz.answerPlaceholder": "Rédigez votre solution ici…",
   "quiz.gradeAnswer": "Corriger la réponse",
   "quiz.score": "Note",
+  "quiz.gradeAll": "Tout corriger",
+  "quiz.finalScore": "Note finale",
+  "quiz.recommendationTitle": "Recommandation",
 
   // History panel
   "history.title": "Historique de conversation",
-  "history.description": "Vos échanges récents avec le tuteur, du plus ancien au plus récent.",
+  "history.description": "Vos échanges avec le tuteur, regroupés par fil.",
   "history.refresh": "Actualiser",
   "history.empty.title": "Pas encore d'historique",
   "history.empty.description":
     "Posez une question ou générez un exercice — vos échanges apparaîtront ici.",
+  "history.unthreaded": "Sans fil",
+  "history.unthreadedHint": "Échanges rattachés à aucun fil.",
+  "history.turnCount": "{count} messages",
 
   // Threads (conversation sessions)
   "threads.title": "Fils de conversation",
@@ -689,6 +743,8 @@ const fr: Record<TranslationKey, string> = {
   "review.empty.title": "Rien à réviser — bravo.",
   "review.empty.description":
     "Vous êtes à jour. Ajoutez une notion ci-dessus pour commencer à la suivre.",
+  "review.helper":
+    "La répétition espacée présente chaque notion juste avant que vous l'oubliiez. Notez votre mémorisation (À revoir, Difficile, Bien, Facile) et elle est replanifiée au moment optimal.",
 
   // Export actions
   "export.copy": "Copier en Markdown",
@@ -700,6 +756,42 @@ const fr: Record<TranslationKey, string> = {
   "export.copyFailed": "Impossible de copier dans le presse-papiers.",
   "export.downloadStarted": "Téléchargement démarré.",
   "export.downloadFailed": "Impossible de préparer le téléchargement.",
+
+  // Documents
+  "doc.upload.title": "Ajouter du contenu de cours",
+  "doc.upload.description":
+    "Importez un PDF, du Markdown ou un fichier texte. Il est indexé et devient consultable dans le tuteur.",
+  "doc.upload.file": "Fichier",
+  "doc.upload.fileHint": "PDF, Markdown (.md) ou texte (.txt).",
+  "doc.upload.course": "Cours",
+  "doc.upload.coursePlaceholder": "ex. Transformée en ondelettes",
+  "doc.upload.chapter": "Chapitre (optionnel)",
+  "doc.upload.chapterHint": "Regroupe le contenu ; laissez vide si aucun.",
+  "doc.upload.chapterPlaceholder": "ex. Chapitre 1",
+  "doc.upload.button": "Importer et indexer",
+  "doc.upload.success": "{pages} page(s) indexée(s) dans « {course} ».",
+  "doc.library.title": "Contenu indexé",
+  "doc.library.description": "Tout ce qui est consultable, par cours et chapitre.",
+  "doc.refresh": "Actualiser",
+  "doc.empty.title": "Rien d’indexé pour l’instant.",
+  "doc.empty.description": "Importez un fichier ci-dessus pour le rendre consultable dans le tuteur.",
+  "doc.pageCount": "{count} page(s)",
+  "doc.uncategorized": "Sans catégorie",
+  "doc.delete.course": "Supprimer le cours",
+  "doc.delete.chapter": "Supprimer",
+  "doc.delete.confirm": "Supprimer « {target} » de l’index ? Cette action est irréversible.",
+  "doc.delete.success": "{count} élément(s) retiré(s) de « {target} ».",
+  "doc.progress.starting": "Préparation…",
+  "doc.progress.pages": "{done} / {total} pages",
+  "doc.progress.elapsed": "Écoulé {time}",
+  "doc.progress.eta": "~{time} restant",
+  "doc.progress.skipped": "{count} déjà indexées",
+  "doc.progress.done": "Terminé — {indexed} pages indexées.",
+  "doc.progress.error": "Échec de l'import : {message}",
+  "doc.upToDate": "À jour",
+  "doc.viewFailed": "Impossible d'ouvrir le fichier.",
+  "doc.delete.confirmShort": "Supprimer ?",
+  "doc.delete.confirmYes": "Oui, supprimer",
 
   // Misc
   "common.loading": "Chargement",
@@ -816,6 +908,8 @@ const nl: Record<TranslationKey, string> = {
   "tabs.threads": "Gesprekken",
   "tabs.history": "Geschiedenis",
   "tabs.review": "Herhaling",
+  // Documents
+  "tabs.documents": "Documenten",
 
   // Health badge
   "health.online": "Backend online",
@@ -927,7 +1021,7 @@ const nl: Record<TranslationKey, string> = {
   "exercise.empty.description":
     "Voer hierboven een begrip in om een op de cursus gebaseerd probleem te genereren.",
   "exercise.solveHint":
-    "Los het op en ga naar het tabblad Beoordelen — je antwoord is gekoppeld aan deze oefening.",
+    "Los het op en beoordeel je antwoord hieronder — het is gekoppeld aan deze oefening.",
 
   // Grade panel
   "grade.title": "Verbeter je antwoord",
@@ -959,14 +1053,20 @@ const nl: Record<TranslationKey, string> = {
   "quiz.answerPlaceholder": "Schrijf hier je oplossing…",
   "quiz.gradeAnswer": "Antwoord beoordelen",
   "quiz.score": "Score",
+  "quiz.gradeAll": "Alles beoordelen",
+  "quiz.finalScore": "Eindscore",
+  "quiz.recommendationTitle": "Aanbeveling",
 
   // History panel
   "history.title": "Gespreksgeschiedenis",
-  "history.description": "Je recente beurten met de tutor, oudste eerst.",
+  "history.description": "Je beurten met de tutor, gegroepeerd per gesprek.",
   "history.refresh": "Vernieuwen",
   "history.empty.title": "Nog geen geschiedenis",
   "history.empty.description":
     "Stel een vraag of genereer een oefening — je beurten verschijnen hier.",
+  "history.unthreaded": "Zonder gesprek",
+  "history.unthreadedHint": "Beurten die aan geen enkel gesprek zijn gekoppeld.",
+  "history.turnCount": "{count} berichten",
 
   // Threads (conversation sessions)
   "threads.title": "Gesprekken",
@@ -1023,6 +1123,8 @@ const nl: Record<TranslationKey, string> = {
   "review.days": "{days} dagen",
   "review.empty.title": "Niets te doen — goed gedaan.",
   "review.empty.description": "Je bent helemaal bij. Voeg hierboven een begrip toe om het te volgen.",
+  "review.helper":
+    "Gespreide herhaling toont elk begrip net voordat je het zou vergeten. Beoordeel je herinnering (Opnieuw, Moeilijk, Goed, Makkelijk) en het wordt op het optimale moment opnieuw ingepland.",
 
   // Export actions
   "export.copy": "Kopiëren als Markdown",
@@ -1033,6 +1135,42 @@ const nl: Record<TranslationKey, string> = {
   "export.copyFailed": "Kon niet naar klembord kopiëren.",
   "export.downloadStarted": "Download gestart.",
   "export.downloadFailed": "Kon de download niet voorbereiden.",
+
+  // Documents
+  "doc.upload.title": "Cursusmateriaal toevoegen",
+  "doc.upload.description":
+    "Upload een PDF-, Markdown- of tekstbestand. Het wordt geïndexeerd en doorzoekbaar in de tutor.",
+  "doc.upload.file": "Bestand",
+  "doc.upload.fileHint": "PDF, Markdown (.md) of tekst (.txt).",
+  "doc.upload.course": "Vak",
+  "doc.upload.coursePlaceholder": "bijv. Wavelet-transformatie",
+  "doc.upload.chapter": "Hoofdstuk (optioneel)",
+  "doc.upload.chapterHint": "Groepeert het materiaal; laat leeg voor geen.",
+  "doc.upload.chapterPlaceholder": "bijv. Hoofdstuk 1",
+  "doc.upload.button": "Uploaden en indexeren",
+  "doc.upload.success": "{pages} pagina('s) geïndexeerd in “{course}”.",
+  "doc.library.title": "Geïndexeerd materiaal",
+  "doc.library.description": "Alles wat nu doorzoekbaar is, per vak en hoofdstuk.",
+  "doc.refresh": "Vernieuwen",
+  "doc.empty.title": "Nog niets geïndexeerd.",
+  "doc.empty.description": "Upload hierboven een bestand om het doorzoekbaar te maken in de tutor.",
+  "doc.pageCount": "{count} pagina('s)",
+  "doc.uncategorized": "Niet-gecategoriseerd",
+  "doc.delete.course": "Vak verwijderen",
+  "doc.delete.chapter": "Verwijderen",
+  "doc.delete.confirm": "“{target}” uit de index verwijderen? Dit kan niet ongedaan worden gemaakt.",
+  "doc.delete.success": "{count} item(s) verwijderd uit “{target}”.",
+  "doc.progress.starting": "Voorbereiden…",
+  "doc.progress.pages": "{done} / {total} pagina's",
+  "doc.progress.elapsed": "Verstreken {time}",
+  "doc.progress.eta": "~{time} resterend",
+  "doc.progress.skipped": "{count} al geïndexeerd",
+  "doc.progress.done": "Klaar — {indexed} pagina's geïndexeerd.",
+  "doc.progress.error": "Import mislukt: {message}",
+  "doc.upToDate": "Bijgewerkt",
+  "doc.viewFailed": "Kon het bestand niet openen.",
+  "doc.delete.confirmShort": "Verwijderen?",
+  "doc.delete.confirmYes": "Ja, verwijderen",
 
   // Misc
   "common.loading": "Laden",

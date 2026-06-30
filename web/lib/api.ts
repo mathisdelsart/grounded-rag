@@ -77,6 +77,23 @@ export interface QuizResponse {
   refused: boolean;
 }
 
+export interface QuizGradeAllItem {
+  question_id: number;
+  answer: string;
+}
+
+export interface QuizGradeResult {
+  question_id: number;
+  score: number;
+  feedback: string;
+}
+
+export interface QuizSummaryResponse {
+  total: number;
+  results: QuizGradeResult[];
+  recommendation: string;
+}
+
 export interface HistoryItem {
   role: string;
   content: string;
@@ -445,6 +462,24 @@ export async function gradeQuizAnswer(
   );
 }
 
+/** Grade every answered question of a quiz at once for a final score. */
+export async function gradeQuizAll(
+  studentId: string,
+  quizId: number,
+  answers: QuizGradeAllItem[],
+  config?: ConnectionConfig,
+): Promise<QuizSummaryResponse> {
+  return request<QuizSummaryResponse>(
+    `/quiz/${quizId}/grade-all`,
+    {
+      method: "POST",
+      headers: buildHeaders(config, true),
+      body: JSON.stringify({ student_id: studentId, answers }),
+    },
+    config,
+  );
+}
+
 /** Create a new account. Returns the created user (id + email). */
 export async function register(
   email: string,
@@ -585,6 +620,27 @@ export async function recordReview(
   );
 }
 
+/**
+ * Add a notion to the spaced-repetition queue, due immediately. Unlike
+ * {@link recordReview} this applies no SM-2 step: the notion is seeded at the
+ * defaults with `due_at` set to now, so it appears in the due queue right away.
+ */
+export async function enqueueReview(
+  studentId: string,
+  notion: string,
+  config?: ConnectionConfig,
+): Promise<ReviewItem> {
+  return request<ReviewItem>(
+    "/reviews/enqueue",
+    {
+      method: "POST",
+      headers: buildHeaders(config, true),
+      body: JSON.stringify({ student_id: studentId, notion }),
+    },
+    config,
+  );
+}
+
 /** Return the student's most recent turns, chronological. */
 export async function history(
   studentId: string,
@@ -594,6 +650,136 @@ export async function history(
   return request<HistoryItem[]>(
     `/history/${encodeURIComponent(studentId)}?limit=${limit}`,
     { method: "GET", headers: buildHeaders(config) },
+    config,
+  );
+}
+
+// --- Documents ---------------------------------------------------------------
+
+/** One chapter of an indexed course and its page count. `chapter` may be null. */
+export interface DocumentChapter {
+  chapter: string | null;
+  pages: number;
+}
+
+/** A course's indexed inventory: its chapters, page count and stored files. */
+export interface DocumentCourse {
+  course: string;
+  total_pages: number;
+  chapters: DocumentChapter[];
+  /** Names of original uploaded files kept for this course (viewable). */
+  files: string[];
+}
+
+/** A progress event streamed while a document is ingested. */
+export interface DocumentProgress {
+  type: "start" | "progress" | "done" | "error";
+  total?: number;
+  skipped?: number;
+  done?: number;
+  indexed?: number;
+  elapsed?: number;
+  message?: string;
+}
+
+/** How many indexed points a delete request removed. */
+export interface DocumentDeleteResult {
+  deleted: number;
+}
+
+/** List the indexed material organized by course and chapter. Empty when none. */
+export async function listDocuments(config?: ConnectionConfig): Promise<DocumentCourse[]> {
+  return request<DocumentCourse[]>(
+    "/documents",
+    { method: "GET", headers: buildHeaders(config) },
+    config,
+  );
+}
+
+/**
+ * Upload a file and ingest it under `course`/`chapter`, streaming progress.
+ *
+ * The body is `multipart/form-data` (Content-Type left unset so the browser adds
+ * the boundary). `onEvent` is called for each ingestion event (`start`,
+ * `progress`, `done`, `error`) so the UI can show a live progress bar. Throws an
+ * `ApiError` if the request cannot be reached or returns a non-2xx status.
+ */
+export async function uploadDocument(
+  file: File,
+  course: string,
+  chapter: string | null,
+  onEvent: (event: DocumentProgress) => void,
+  config?: ConnectionConfig,
+): Promise<void> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("course", course);
+  if (chapter && chapter.trim()) form.append("chapter", chapter.trim());
+
+  const url = `${resolveBaseUrl(config)}/documents/upload`;
+  let response: Response;
+  try {
+    response = await fetch(url, { method: "POST", headers: buildHeaders(config), body: form });
+  } catch {
+    throw new ApiError(
+      "Could not reach the backend. Check that it is running and the base URL is correct.",
+    );
+  }
+  if (!response.ok) throw new ApiError(await readError(response), response.status);
+  if (!response.body) throw new ApiError("Streaming is not supported by this response.", response.status);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const handle = (raw: string) => {
+    const data = raw
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim())
+      .join("");
+    if (!data) return;
+    try {
+      onEvent(JSON.parse(data) as DocumentProgress);
+    } catch {
+      // ignore malformed frames
+    }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      handle(buffer.slice(0, sep));
+      buffer = buffer.slice(sep + 2);
+    }
+  }
+}
+
+/** Fetch a stored original file as a Blob (sends auth headers, unlike a plain link). */
+export async function fetchDocumentFile(
+  course: string,
+  name: string,
+  config?: ConnectionConfig,
+): Promise<Blob> {
+  const params = new URLSearchParams({ course, name });
+  const url = `${resolveBaseUrl(config)}/documents/file?${params.toString()}`;
+  const response = await fetch(url, { method: "GET", headers: buildHeaders(config) });
+  if (!response.ok) throw new ApiError(await readError(response), response.status);
+  return response.blob();
+}
+
+/** Delete a course's indexed points, optionally narrowed to one chapter. */
+export async function deleteDocument(
+  course: string,
+  chapter: string | null,
+  config?: ConnectionConfig,
+): Promise<DocumentDeleteResult> {
+  const params = new URLSearchParams({ course });
+  if (chapter) params.set("chapter", chapter);
+  return request<DocumentDeleteResult>(
+    `/documents?${params.toString()}`,
+    { method: "DELETE", headers: buildHeaders(config) },
     config,
   );
 }

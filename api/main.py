@@ -9,6 +9,9 @@ Endpoints:
     POST /quiz              generate a grounded multi-question quiz (no solutions)
     POST /quiz/{id}/grade   grade one quiz answer against its stored reference
     GET  /courses           list the distinct courses indexed in Qdrant
+    GET  /documents         inventory of indexed material by course and chapter
+    POST /documents/upload  ingest an uploaded file under a course/chapter
+    DELETE /documents       delete a course's (or one chapter's) indexed points
     GET  /source/{chunk_id} fetch a cited source chunk's text and metadata
     GET  /history/{id}      recent conversation turns for a student
     POST /sessions          open a named conversation thread for a student
@@ -17,6 +20,7 @@ Endpoints:
     POST /feedback          record a thumbs up/down on a tutor answer
     GET  /feedback/summary  thumbs up/down counts for a student
     POST /reviews           record a recall rating and reschedule a notion (SM-2)
+    POST /reviews/enqueue   add a notion to the review queue, due immediately
     GET  /reviews/due       notions due for spaced-repetition review
 
 The layer stays thin: each route delegates to the existing grounded functions
@@ -28,20 +32,31 @@ are persisted as conversation history, and ``/history`` replays them.
 import hmac
 import json
 import logging
+import os
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Engine, func, select
 
 from agent.nodes.generate import generate
 from agent.nodes.grade import grade
-from agent.nodes.quiz import generate_quiz, grade_quiz_answer
+from agent.nodes.quiz import generate_quiz, grade_quiz_answer, summarize_quiz
 from agent.nodes.reexplain import reexplain
 from agent.state import Level, TutorState, to_history
 from api.auth import (
@@ -64,6 +79,13 @@ from api.middleware import (
 from core.answer import answer, stream_answer
 from core.config import get_settings
 from core.courses import list_courses
+from core.documents import (
+    delete_documents,
+    list_documents,
+    save_upload,
+    stored_file_path,
+    stream_ingest,
+)
 from core.scheduling import MAX_QUALITY, MIN_QUALITY, schedule
 from core.sources import get_source
 from db.models import Feedback, Review, Student
@@ -355,6 +377,36 @@ class QuizGradeRequest(BaseModel):
     answer: str
 
 
+class QuizGradeAllItem(BaseModel):
+    """One question's answer in a whole-quiz grading request."""
+
+    question_id: int
+    answer: str
+
+
+class QuizGradeAllRequest(BaseModel):
+    """All of a student's quiz answers, graded together for a final score."""
+
+    student_id: str
+    answers: list[QuizGradeAllItem]
+
+
+class QuizGradeResult(BaseModel):
+    """One question's verdict in a whole-quiz summary."""
+
+    question_id: int
+    score: int
+    feedback: str
+
+
+class QuizSummaryResponse(BaseModel):
+    """A whole-quiz verdict: a final score and a personalized recommendation."""
+
+    total: int
+    results: list[QuizGradeResult]
+    recommendation: str
+
+
 class HistoryItem(BaseModel):
     """A single persisted conversation turn."""
 
@@ -367,6 +419,34 @@ class CoursesResponse(BaseModel):
     """The distinct courses currently indexed in Qdrant, sorted."""
 
     courses: list[str]
+
+
+class DocumentChapter(BaseModel):
+    """One chapter of a course and how many distinct pages it carries.
+
+    ``chapter`` is ``None`` for material indexed without one (a UI groups it as
+    "Uncategorized").
+    """
+
+    chapter: str | None = None
+    pages: int
+
+
+class DocumentCourse(BaseModel):
+    """A course's indexed inventory: its chapters, page count and stored files."""
+
+    course: str
+    total_pages: int
+    chapters: list[DocumentChapter]
+    # Names of original uploaded files kept for this course (viewable via
+    # GET /documents/file). Empty for material indexed outside the upload UI.
+    files: list[str] = []
+
+
+class DocumentDeleteResponse(BaseModel):
+    """How many indexed points were removed by a delete request."""
+
+    deleted: int
 
 
 class SourceResponse(BaseModel):
@@ -462,6 +542,18 @@ class ReviewRequest(BaseModel):
         if not (MIN_QUALITY <= value <= MAX_QUALITY):
             raise ValueError(f"quality must be in {MIN_QUALITY}..{MAX_QUALITY}.")
         return value
+
+
+class EnqueueReviewRequest(BaseModel):
+    """A request to add a notion to the spaced-repetition queue, due immediately.
+
+    Unlike :class:`ReviewRequest` this carries no recall rating: the notion is
+    seeded at the SM-2 defaults with ``due_at`` set to "now" so it surfaces in
+    the due queue straight away, ready for its first rating.
+    """
+
+    student_id: str
+    notion: str
 
 
 class ReviewSchedule(BaseModel):
@@ -775,6 +867,30 @@ def quiz_grade(
     return {"score": verdict["score"], "feedback": verdict["feedback"]}
 
 
+@app.post(
+    "/quiz/{quiz_id}/grade-all",
+    response_model=QuizSummaryResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def quiz_grade_all(
+    quiz_id: int, request: QuizGradeAllRequest, user: UserOut | None = OptionalUser
+) -> dict[str, Any]:
+    """Grade every answered question of a quiz at once and return a final score.
+
+    Each answer is graded against its question's stored reference solution (loaded
+    server-side, never sent by the client) and every verdict is persisted, exactly
+    like one-by-one grading. The response carries the average score, the per-
+    question verdicts, and a short study recommendation drawn from all the feedback
+    in the language of the student's answers. The student is ensured to exist (and
+    linked to the caller when authenticated). Questions that cannot be resolved are
+    skipped rather than failing the whole request.
+    """
+    with get_session(_engine) as session:
+        _resolve_student(session, request.student_id, user)
+    answers = [{"question_id": a.question_id, "answer": a.answer} for a in request.answers]
+    return summarize_quiz(quiz_id, answers, request.student_id)
+
+
 @app.get(
     "/courses",
     response_model=CoursesResponse,
@@ -788,6 +904,83 @@ def courses() -> dict[str, list[str]]:
     indexed yet; it never reaches the LLM and runs no retrieval.
     """
     return {"courses": list_courses()}
+
+
+@app.get(
+    "/documents",
+    response_model=list[DocumentCourse],
+    dependencies=[Depends(require_api_key)],
+)
+def documents() -> list[dict[str, Any]]:
+    """Return the indexed material organized by course and chapter.
+
+    Lets a client show what is indexed (and how much) so a user can manage it.
+    The shape is ``[{course, total_pages, chapters: [{chapter, pages}]}]`` with a
+    ``null`` chapter for material indexed without one. Returns an empty list when
+    nothing is indexed yet; it never reaches the LLM and runs no retrieval.
+    """
+    return list_documents()
+
+
+@app.post("/documents/upload", dependencies=[Depends(require_api_key)])
+async def upload_document(
+    file: Annotated[UploadFile, File()],
+    course: Annotated[str, Form()],
+    chapter: Annotated[str | None, Form()] = None,
+) -> StreamingResponse:
+    """Ingest an uploaded file, streaming ingestion progress as Server-Sent Events.
+
+    The original file is stored under ``uploads/<course>/`` so it can be re-opened
+    later, then ingested incrementally: ``.md``/``.txt`` via the prose loader,
+    anything else via the math-aware PDF vision path. Each SSE ``data:`` line is a
+    JSON event from ``core.documents.stream_ingest`` — ``start`` (with the total
+    page count and how many were already indexed and thus skipped), one
+    ``progress`` per batch (pages done, indexed count, elapsed seconds), then a
+    final ``done`` or ``error``. Pages already indexed for the course are skipped,
+    so re-running an interrupted upload never re-pays the vision model, and each
+    batch is indexed as it is extracted, so a failure keeps the pages done so far.
+    """
+    normalized_chapter = chapter.strip() if chapter and chapter.strip() else None
+    contents = await file.read()
+    # Persist the original so the user can re-open the intact file later; ingest
+    # from that stored path (its extension drives prose/PDF routing).
+    stored_path = save_upload(contents, course, file.filename or "document")
+
+    def event_stream() -> Iterator[str]:
+        for event in stream_ingest(stored_path, course, normalized_chapter):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/documents/file", dependencies=[Depends(require_api_key)])
+def document_file(course: str, name: str) -> FileResponse:
+    """Serve a stored original file so the user can re-open it intact.
+
+    ``course`` and ``name`` identify a file previously saved by an upload. The
+    path is resolved inside the course's upload directory with a traversal guard;
+    an unknown file yields 404.
+    """
+    path = stored_file_path(course, name)
+    if path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+    return FileResponse(path, filename=os.path.basename(path))
+
+
+@app.delete(
+    "/documents",
+    response_model=DocumentDeleteResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def remove_documents(course: str, chapter: str | None = None) -> dict[str, int]:
+    """Delete a course's indexed points, optionally narrowed to one chapter.
+
+    ``course`` is required; ``chapter`` (a query parameter) restricts the deletion
+    to a single chapter when given. Returns how many points were removed. A
+    missing collection or an unknown course yields ``{"deleted": 0}`` rather than
+    an error; it never reaches the LLM and runs no retrieval.
+    """
+    return {"deleted": delete_documents(course, chapter)}
 
 
 @app.get(
@@ -1047,6 +1240,48 @@ def record_review(request: ReviewRequest, user: UserOut | None = OptionalUser) -
             "ease": row.ease,
             "interval_days": row.interval_days,
             "due_at": due_at.isoformat(),
+        }
+
+
+@app.post(
+    "/reviews/enqueue",
+    response_model=ReviewSchedule,
+    dependencies=[Depends(require_api_key)],
+)
+def enqueue_review(
+    request: EnqueueReviewRequest, user: UserOut | None = OptionalUser
+) -> dict[str, Any]:
+    """Add a notion to the spaced-repetition queue, due immediately.
+
+    The student is ensured to exist (and linked to the caller when
+    authenticated). At most one review row exists per ``(student, notion)``: an
+    existing row is reset to the SM-2 defaults rather than duplicated. No SM-2
+    step is applied; ``due_at`` is set to "now" so the notion is due right away
+    and appears in ``GET /reviews/due``, ready for its first rating. This route
+    reaches no LLM and runs no retrieval.
+    """
+    now = datetime.now(UTC)
+    with get_session(_engine) as session:
+        student = _resolve_student(session, request.student_id, user)
+        row = session.scalar(
+            select(Review).where(Review.student_id == student.id, Review.notion == request.notion)
+        )
+        if row is None:
+            row = Review(student_id=student.id, notion=request.notion)
+            session.add(row)
+        # Seed (or reset) the SM-2 state so the notion is due immediately.
+        row.ease = 2.5
+        row.interval_days = 0
+        row.repetitions = 0
+        row.last_reviewed = None
+        row.due_at = now
+        session.flush()
+
+        return {
+            "notion": row.notion,
+            "ease": row.ease,
+            "interval_days": row.interval_days,
+            "due_at": now.isoformat(),
         }
 
 
