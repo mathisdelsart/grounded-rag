@@ -175,41 +175,40 @@ export function ExercisePanel({ studentId, config }: ExercisePanelProps) {
             </CardBody>
           </Card>
 
-          <Card>
-            <CardHeader title={t("grade.verdictTitle")} />
-            <CardBody>
-              {grading ? (
-                <ThinkingIndicator variant="grade" />
-              ) : result == null ? (
-                <EmptyState
-                  title={t("grade.empty.title")}
-                  description={t("grade.empty.description")}
-                />
-              ) : (
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                        {t("grade.score")}
-                      </span>
-                      <span className="text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                        {score}/100
-                      </span>
+          {/* The correction card only appears once grading starts — no empty
+              "not graded yet" placeholder. */}
+          {(grading || result) && (
+            <Card>
+              <CardHeader title={t("grade.verdictTitle")} />
+              <CardBody>
+                {grading ? (
+                  <ThinkingIndicator variant="grade" />
+                ) : result ? (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                          {t("grade.score")}
+                        </span>
+                        <span className="text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                          {score}/100
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                        <div
+                          className={cn("h-full rounded-full transition-all", scoreTone(score))}
+                          style={{ width: `${score}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                      <div
-                        className={cn("h-full rounded-full transition-all", scoreTone(score))}
-                        style={{ width: `${score}%` }}
-                      />
+                    <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                      <Markdown>{result.feedback}</Markdown>
                     </div>
                   </div>
-                  <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800">
-                    <Markdown>{result.feedback}</Markdown>
-                  </div>
-                </div>
-              )}
-            </CardBody>
-          </Card>
+                ) : null}
+              </CardBody>
+            </Card>
+          )}
         </>
       )}
     </div>

@@ -23,7 +23,6 @@ import { ExercisePanel } from "@/components/panels/ExercisePanel";
 import { QuizPanel } from "@/components/panels/QuizPanel";
 import { ThreadsPanel } from "@/components/panels/ThreadsPanel";
 import { HistoryPanel } from "@/components/panels/HistoryPanel";
-import { ReviewPanel } from "@/components/panels/ReviewPanel";
 import { DocumentsPanel } from "@/components/panels/DocumentsPanel";
 
 export default function Home() {
@@ -34,7 +33,6 @@ export default function Home() {
     { id: "quiz", label: t("tabs.quiz") },
     { id: "threads", label: t("tabs.threads") },
     { id: "history", label: t("tabs.history") },
-    { id: "review", label: t("tabs.review") },
     { id: "documents", label: t("tabs.documents") },
   ];
 
@@ -236,6 +234,7 @@ export default function Home() {
                   config={config}
                   value={activeSessionId}
                   onChange={selectSession}
+                  onManage={() => setActive("threads")}
                 />
 
                 <Tabs tabs={TABS} active={active} onChange={setActive} />
@@ -276,13 +275,6 @@ export default function Home() {
                       studentId={studentId}
                       config={config}
                       active={active === "history"}
-                    />
-                  )}
-                  {active === "review" && (
-                    <ReviewPanel
-                      studentId={studentId}
-                      config={config}
-                      active={active === "review"}
                     />
                   )}
                   {active === "documents" && (

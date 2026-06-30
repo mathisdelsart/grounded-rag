@@ -166,6 +166,7 @@ const en = {
 
   // Shared
   "common.requestFailed": "Request failed.",
+  "common.upToDate": "Up to date",
   "common.submitHint": "Press ⌘/Ctrl + Enter to submit.",
   "common.sources": "Sources",
   "common.noSources": "No sources cited.",
@@ -302,6 +303,11 @@ const en = {
   "threads.create": "Create",
   "threads.created": "Thread created.",
   "threads.createFailed": "Could not create the thread.",
+  "threads.delete": "Delete",
+  "threads.delete.confirm": "Delete this thread?",
+  "threads.delete.yes": "Yes, delete",
+  "threads.deleted": "Thread deleted — its messages stay in your history.",
+  "threads.deleteFailed": "Could not delete the thread.",
   "threads.none": "All history (unthreaded)",
   "threads.noneHint": "New questions are not attached to any thread.",
   "threads.untitled": "Untitled thread",
@@ -575,6 +581,7 @@ const fr: Record<TranslationKey, string> = {
 
   // Shared
   "common.requestFailed": "La requête a échoué.",
+  "common.upToDate": "À jour",
   "common.submitHint": "Appuyez sur ⌘/Ctrl + Entrée pour envoyer.",
   "common.sources": "Sources",
   "common.noSources": "Aucune source citée.",
@@ -717,6 +724,11 @@ const fr: Record<TranslationKey, string> = {
   "threads.create": "Créer",
   "threads.created": "Fil créé.",
   "threads.createFailed": "Impossible de créer le fil.",
+  "threads.delete": "Supprimer",
+  "threads.delete.confirm": "Supprimer ce fil ?",
+  "threads.delete.yes": "Oui, supprimer",
+  "threads.deleted": "Fil supprimé — ses messages restent dans votre historique.",
+  "threads.deleteFailed": "Impossible de supprimer le fil.",
   "threads.none": "Tout l'historique (sans fil)",
   "threads.noneHint": "Les nouvelles questions ne sont rattachées à aucun fil.",
   "threads.untitled": "Fil sans titre",
@@ -981,6 +993,7 @@ const nl: Record<TranslationKey, string> = {
 
   // Shared
   "common.requestFailed": "Verzoek mislukt.",
+  "common.upToDate": "Bijgewerkt",
   "common.submitHint": "Druk op ⌘/Ctrl + Enter om te verzenden.",
   "common.sources": "Bronnen",
   "common.noSources": "Geen bronnen geciteerd.",
@@ -1116,6 +1129,11 @@ const nl: Record<TranslationKey, string> = {
   "threads.create": "Aanmaken",
   "threads.created": "Gesprek aangemaakt.",
   "threads.createFailed": "Kon het gesprek niet aanmaken.",
+  "threads.delete": "Verwijderen",
+  "threads.delete.confirm": "Dit gesprek verwijderen?",
+  "threads.delete.yes": "Ja, verwijderen",
+  "threads.deleted": "Gesprek verwijderd — de berichten blijven in je geschiedenis.",
+  "threads.deleteFailed": "Kon het gesprek niet verwijderen.",
   "threads.none": "Alle geschiedenis (zonder gesprek)",
   "threads.noneHint": "Nieuwe vragen worden aan geen enkel gesprek gekoppeld.",
   "threads.untitled": "Naamloos gesprek",
