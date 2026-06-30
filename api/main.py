@@ -41,7 +41,7 @@ from sqlalchemy import Engine, func, select
 
 from agent.nodes.generate import generate
 from agent.nodes.grade import grade
-from agent.nodes.quiz import generate_quiz, grade_quiz_answer
+from agent.nodes.quiz import generate_quiz, grade_quiz_answer, summarize_quiz
 from agent.nodes.reexplain import reexplain
 from agent.state import Level, TutorState, to_history
 from api.auth import (
@@ -353,6 +353,36 @@ class QuizGradeRequest(BaseModel):
     student_id: str
     question_id: int
     answer: str
+
+
+class QuizGradeAllItem(BaseModel):
+    """One question's answer in a whole-quiz grading request."""
+
+    question_id: int
+    answer: str
+
+
+class QuizGradeAllRequest(BaseModel):
+    """All of a student's quiz answers, graded together for a final score."""
+
+    student_id: str
+    answers: list[QuizGradeAllItem]
+
+
+class QuizGradeResult(BaseModel):
+    """One question's verdict in a whole-quiz summary."""
+
+    question_id: int
+    score: int
+    feedback: str
+
+
+class QuizSummaryResponse(BaseModel):
+    """A whole-quiz verdict: a final score and a personalized recommendation."""
+
+    total: int
+    results: list[QuizGradeResult]
+    recommendation: str
 
 
 class HistoryItem(BaseModel):
@@ -773,6 +803,30 @@ def quiz_grade(
             detail="Quiz question not found.",
         )
     return {"score": verdict["score"], "feedback": verdict["feedback"]}
+
+
+@app.post(
+    "/quiz/{quiz_id}/grade-all",
+    response_model=QuizSummaryResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def quiz_grade_all(
+    quiz_id: int, request: QuizGradeAllRequest, user: UserOut | None = OptionalUser
+) -> dict[str, Any]:
+    """Grade every answered question of a quiz at once and return a final score.
+
+    Each answer is graded against its question's stored reference solution (loaded
+    server-side, never sent by the client) and every verdict is persisted, exactly
+    like one-by-one grading. The response carries the average score, the per-
+    question verdicts, and a short study recommendation drawn from all the feedback
+    in the language of the student's answers. The student is ensured to exist (and
+    linked to the caller when authenticated). Questions that cannot be resolved are
+    skipped rather than failing the whole request.
+    """
+    with get_session(_engine) as session:
+        _resolve_student(session, request.student_id, user)
+    answers = [{"question_id": a.question_id, "answer": a.answer} for a in request.answers]
+    return summarize_quiz(quiz_id, answers, request.student_id)
 
 
 @app.get(

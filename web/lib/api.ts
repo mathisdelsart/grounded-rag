@@ -77,6 +77,23 @@ export interface QuizResponse {
   refused: boolean;
 }
 
+export interface QuizGradeAllItem {
+  question_id: number;
+  answer: string;
+}
+
+export interface QuizGradeResult {
+  question_id: number;
+  score: number;
+  feedback: string;
+}
+
+export interface QuizSummaryResponse {
+  total: number;
+  results: QuizGradeResult[];
+  recommendation: string;
+}
+
 export interface HistoryItem {
   role: string;
   content: string;
@@ -440,6 +457,24 @@ export async function gradeQuizAnswer(
       method: "POST",
       headers: buildHeaders(config, true),
       body: JSON.stringify({ student_id: studentId, question_id: questionId, answer }),
+    },
+    config,
+  );
+}
+
+/** Grade every answered question of a quiz at once for a final score. */
+export async function gradeQuizAll(
+  studentId: string,
+  quizId: number,
+  answers: QuizGradeAllItem[],
+  config?: ConnectionConfig,
+): Promise<QuizSummaryResponse> {
+  return request<QuizSummaryResponse>(
+    `/quiz/${quizId}/grade-all`,
+    {
+      method: "POST",
+      headers: buildHeaders(config, true),
+      body: JSON.stringify({ student_id: studentId, answers }),
     },
     config,
   );
