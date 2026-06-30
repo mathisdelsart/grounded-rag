@@ -12,120 +12,100 @@ import {
 import { KEYS, readLocal, writeLocal } from "@/lib/storage";
 
 /** Supported UI locales. UI strings only — never API-returned content. */
-export type Locale = "en" | "fr";
+export type Locale = "en" | "fr" | "nl";
 
 /** Stable, English dictionary. Keys are stable ids; English doubles as fallback. */
 const en = {
   // Header / chrome
-  "app.name": "Grounded Tutor",
+  "app.name": "Sourcio",
   "app.tagline": "Answers only from your course",
   "header.signIn": "Sign in",
-  "footer.tagline": "Grounded retrieval · citations by construction · honest refusals",
 
   // Language toggle
   "lang.label": "Language",
-  "lang.switchToFrench": "Switch to French",
-  "lang.switchToEnglish": "Switch to English",
-
-  // Theme toggle
-  "theme.switchToLight": "Switch to light theme",
-  "theme.switchToDark": "Switch to dark theme",
 
   // Hero
-  "hero.title": "Grounded Tutor",
-  "hero.valueProp":
-    "An AI tutor grounded strictly in your own course material — always cited, never makes things up.",
   "hero.description":
     "Index your slides and notes once, then ask in plain language. Every answer is backed by a citation, or honestly refused when the course doesn't cover it.",
   "hero.cta": "Try it",
   "hero.ctaAria": "Scroll to the tutor",
   "hero.principles": "Key principles",
-  "hero.chip.grounded": "Grounded",
-  "hero.chip.cited": "Cited",
-  "hero.chip.refuses": "Refuses to hallucinate",
   // Two-tone headline: a leading part in ink, an emphasized part in brand.
   "hero.headline.lead": "An AI tutor grounded in your course —",
   "hero.headline.accent": "always cited, never invented.",
-  // Trust badges row.
-  "hero.badge.refuses": "Refuses to hallucinate",
-  "hero.badge.cited": "Cited by construction",
-  "hero.badge.private": "Private — runs locally",
+  // Trust badges row — the keywords Sourcio leads with.
+  "hero.badge.cited": "Always cited",
+  "hero.badge.refuses": "Never invented",
+  "hero.badge.fromCourse": "From your courses",
+  "hero.badge.verifiable": "100% verifiable",
   // Right-side answer-preview mock card.
-  "hero.preview.question": "What is the admissibility condition?",
+  "hero.preview.question": "What does the Pythagorean theorem state?",
   "hero.preview.answer":
-    "A wavelet must have zero mean, so its Fourier transform vanishes at the origin and the admissibility integral stays finite.",
-  "hero.preview.citation": "(Wavelet Transform, p.57)",
-  "hero.preview.refusalLabel": "Off-topic question",
+    "In a right triangle, the square of the hypotenuse equals the sum of the squares of the other two sides: a² + b² = c².",
+  "hero.preview.citation": "(Mathematics, Ch. 3, p.21)",
   "hero.preview.refusal": "Not in the course material.",
   // App-window mockup (right of the hero).
-  "hero.app.window": "Grounded Tutor",
+  "hero.app.context": "Mathematics · Chapter 3",
   "hero.app.tab.ask": "Ask",
   "hero.app.tab.exercise": "Exercise",
   "hero.app.tab.grade": "Grade",
-  "hero.app.prompt": "Ask your course",
   "hero.app.answered": "Answered from your material",
-  "hero.app.refusalQuestion": "How do I set up a Kubernetes cluster?",
+  "hero.app.refusalQuestion": "What's the weather tomorrow?",
 
-  // Stats band — figures are taken verbatim from the README metrics table.
-  "stats.eyebrow": "Measured on a full course run",
-  "stats.title": "Numbers from a full course run",
+  // Stats band — benefit-first figures, no internal jargon.
+  "stats.eyebrow": "Why students trust it",
+  "stats.title": "Built for answers you can rely on",
   "stats.subtitle":
-    "Real figures from indexing and querying one complete course end to end — no synthetic benchmarks.",
-  "stats.hitRate.value": "82%",
-  "stats.hitRate.label": "Retrieval hit-rate with the cross-encoder reranker",
-  "stats.hybrid.value": "+9 pts",
-  "stats.hybrid.label": "Hit-rate gain from hybrid dense + BM25 retrieval",
-  "stats.separation.value": "100%",
-  "stats.separation.label": "In-course / out-of-course threshold separation",
-  "stats.faithfulness.value": "75%",
-  "stats.faithfulness.label": "Faithfulness on the offline LLM-as-a-judge harness",
-  "stats.local.value": "0 €",
-  "stats.local.label": "Fully-local option — embeddings, reranker and store run offline",
+    "Every answer comes from your own courses and shows where it's from — so you can revise without second-guessing.",
+  "stats.cited.value": "100%",
+  "stats.cited.label": "Answers cited — never made up",
+  "stats.fromCourse.value": "82%",
+  "stats.fromCourse.label": "Questions answered straight from your own courses",
+  "stats.tools.value": "8",
+  "stats.tools.label": "Ways to study: ask, quiz, practice, grade and more",
+  "stats.free.value": "0 €",
+  "stats.free.label": "To get started — no credit card needed",
 
   // How it works
   "how.eyebrow": "How it works",
   "how.title": "From your course to a cited answer",
   "how.subtitle":
-    "Three steps from raw slides to an answer you can trust — index once, ask anything, get the source.",
-  "how.step1.title": "Index your course once",
+    "Three steps from raw slides to an answer you can trust — add once, ask anything, get the source.",
+  "how.step1.title": "Add your course",
   "how.step1.body":
-    "Add your slides, exercises and notes. They're parsed math-aware and stored as a private, searchable knowledge base.",
-  "how.step2.title": "Ask in natural language",
+    "Drop in your slides, notes and exercises. They become a private space only your tutor can read.",
+  "how.step2.title": "Ask your questions",
   "how.step2.body":
-    "Question it the way you'd ask a tutor. Retrieval finds the most relevant passages from your own material.",
-  "how.step3.title": "Get a cited answer — or a refusal",
+    "Ask the way you'd ask a tutor. It pulls the most relevant passages straight from your own material.",
+  "how.step3.title": "A cited answer, or a refusal",
   "how.step3.body":
-    "Answers carry the exact source (course, page). If the course doesn't cover it, the tutor says so instead of guessing.",
+    "Each answer shows its exact source. If your course doesn't cover it, the tutor says so instead of guessing.",
 
   // Features
   "features.eyebrow": "Why it's different",
-  "features.title": "Built to be trusted, not just helpful",
+  "features.title": "Reliable answers, every time",
   "features.subtitle":
-    "Every design choice serves one rule: stay inside your course material, and prove it on every answer.",
-  "features.cited.title": "Cited by construction",
+    "Every answer comes from your course and shows its source — so you can revise with peace of mind.",
+  "features.cited.title": "Every answer cites its source",
   "features.cited.body":
-    "Sources are mapped in code, not written by the model — so a citation can never point to a page it invented.",
-  "features.refusal.title": "Refusal guard",
+    "You always see where an answer comes from — the course, the chapter, the page. Never an answer out of nowhere.",
+  "features.refusal.title": "It refuses rather than invent",
   "features.refusal.body":
-    "A similarity threshold and a faithfulness check make the tutor refuse anything the course doesn't support.",
-  "features.retrieval.title": "Advanced retrieval",
+    "If the answer isn't in your course, the tutor says so honestly instead of guessing.",
+  "features.retrieval.title": "It finds the right passage",
   "features.retrieval.body":
-    "Threshold-based search with an optional cross-encoder reranker surfaces the right passage before answering.",
-  "features.private.title": "Private by default",
+    "Ask in plain language and the tutor pulls the exact extract from your course that answers you.",
+  "features.private.title": "Your courses stay private",
   "features.private.body":
-    "Local multilingual embeddings and a self-hosted vector store keep your course material on your own infrastructure.",
-  "features.quiz.title": "Quiz & spaced repetition",
+    "Your material stays yours — nothing is shared or reused anywhere else.",
+  "features.quiz.title": "Practice and revise",
   "features.quiz.body":
-    "Generate grounded exercises and quizzes, then schedule notions for review at the right moment.",
-  "features.bilingual.title": "Bilingual",
-  "features.bilingual.body":
-    "Works across English and French course material, with a fully bilingual interface.",
+    "Generate exercises and quizzes from your courses, and revise each notion at the right moment.",
+  "features.bilingual.title": "Multilingual",
+  "features.bilingual.body": "Works with your courses in French, English and Dutch.",
   // Mini visual inside the highlighted bento tile.
-  "features.cited.demo.answer": "…the admissibility integral stays finite",
-  "features.cited.demo.chip": "(Wavelet Transform, p.57)",
-  // Inline detail pills inside the refusal-guard tile.
-  "features.refusal.pill.threshold": "similarity threshold",
-  "features.refusal.pill.faithfulness": "faithfulness check",
+  "features.cited.demo.answer": "…so a² + b² = c²",
+  "features.cited.demo.chip": "(Mathematics, Ch. 3, p.21)",
 
   // Landing CTA / footer
   "landing.cta.title": "Ready to revise from your own course?",
@@ -137,7 +117,7 @@ const en = {
   "footer.link.how": "How it works",
   "footer.link.features": "Features",
   "footer.link.tool": "Open the tutor",
-  "footer.credit": "grounded-rag — built by mathisdelsart.",
+  "footer.credit": "Sourcio — built by Mathis Delsart.",
 
   // Tabs
   "tabs.aria": "Tutor sections",
@@ -198,8 +178,12 @@ const en = {
   // Ask panel
   "ask.title": "Ask a question",
   "ask.description": "Answers come strictly from your indexed course material.",
+  // Pre-filled example (mirrors the hero) so the tool is instantly clear.
+  "ask.example.question": "What does the Pythagorean theorem state?",
+  "ask.example.course": "Mathematics",
+  "ask.example.chapter": "Chapter 3",
   "ask.questionLabel": "Question",
-  "ask.questionPlaceholder": "e.g. What is the admissibility condition for a wavelet?",
+  "ask.questionPlaceholder": "e.g. What does the Pythagorean theorem state?",
   "ask.courseLabel": "Course filter",
   "ask.courseHint": "Optional — restrict retrieval to one course.",
   "ask.coursePlaceholder": "e.g. ELEC2885 Wavelet Transform",
@@ -368,116 +352,96 @@ export type TranslationKey = keyof typeof en;
 /** French dictionary. Same keys as `en`; values are translations. */
 const fr: Record<TranslationKey, string> = {
   // Header / chrome
-  "app.name": "Grounded Tutor",
+  "app.name": "Sourcio",
   "app.tagline": "Répond uniquement à partir de votre cours",
   "header.signIn": "Se connecter",
-  "footer.tagline":
-    "Récupération ancrée · citations par construction · refus honnêtes",
 
   // Language toggle
   "lang.label": "Langue",
-  "lang.switchToFrench": "Passer en français",
-  "lang.switchToEnglish": "Passer en anglais",
-
-  // Theme toggle
-  "theme.switchToLight": "Passer en thème clair",
-  "theme.switchToDark": "Passer en thème sombre",
 
   // Hero
-  "hero.title": "Grounded Tutor",
-  "hero.valueProp":
-    "Un tuteur IA strictement ancré dans votre propre matériel de cours — toujours cité, n'invente jamais rien.",
   "hero.description":
     "Indexez vos slides et vos notes une seule fois, puis posez vos questions en langage naturel. Chaque réponse est étayée par une citation, ou honnêtement refusée si le cours ne la couvre pas.",
   "hero.cta": "Essayer",
   "hero.ctaAria": "Faire défiler jusqu'au tuteur",
   "hero.principles": "Principes clés",
-  "hero.chip.grounded": "Ancré",
-  "hero.chip.cited": "Cité",
-  "hero.chip.refuses": "Refuse d'halluciner",
   // Two-tone headline: a leading part in ink, an emphasized part in brand.
   "hero.headline.lead": "Un tuteur IA ancré dans votre cours —",
   "hero.headline.accent": "toujours cité, jamais inventé.",
-  // Trust badges row.
-  "hero.badge.refuses": "Refuse d'halluciner",
-  "hero.badge.cited": "Cité par construction",
-  "hero.badge.private": "Privé — fonctionne en local",
+  // Trust badges row — the keywords Sourcio leads with.
+  "hero.badge.cited": "Toujours cité",
+  "hero.badge.refuses": "Jamais inventé",
+  "hero.badge.fromCourse": "Depuis vos cours",
+  "hero.badge.verifiable": "100% vérifiable",
   // Right-side answer-preview mock card.
-  "hero.preview.question": "Quelle est la condition d'admissibilité ?",
+  "hero.preview.question": "Que dit le théorème de Pythagore ?",
   "hero.preview.answer":
-    "Une ondelette doit être de moyenne nulle : sa transformée de Fourier s'annule à l'origine et l'intégrale d'admissibilité reste finie.",
-  "hero.preview.citation": "(Wavelet Transform, p.57)",
-  "hero.preview.refusalLabel": "Question hors-sujet",
+    "Dans un triangle rectangle, le carré de l'hypoténuse est égal à la somme des carrés des deux autres côtés : a² + b² = c².",
+  "hero.preview.citation": "(Mathématiques, Chap. 3, p.21)",
   "hero.preview.refusal": "Absent du matériel de cours.",
   // App-window mockup (right of the hero).
-  "hero.app.window": "Grounded Tutor",
+  "hero.app.context": "Mathématiques · Chapitre 3",
   "hero.app.tab.ask": "Demander",
   "hero.app.tab.exercise": "Exercice",
   "hero.app.tab.grade": "Corriger",
-  "hero.app.prompt": "Interrogez votre cours",
   "hero.app.answered": "Répondu à partir de votre matériel",
-  "hero.app.refusalQuestion": "Comment configurer un cluster Kubernetes ?",
+  "hero.app.refusalQuestion": "Quel temps fera-t-il demain ?",
 
-  // Stats band — figures are taken verbatim from the README metrics table.
-  "stats.eyebrow": "Mesuré sur un cours complet",
-  "stats.title": "Des chiffres issus d'un cours complet",
+  // Stats band — chiffres orientés bénéfice, sans jargon interne.
+  "stats.eyebrow": "Pourquoi lui faire confiance",
+  "stats.title": "Conçu pour des réponses fiables",
   "stats.subtitle":
-    "Des chiffres réels issus de l'indexation et de l'interrogation d'un cours complet de bout en bout — aucun benchmark synthétique.",
-  "stats.hitRate.value": "82 %",
-  "stats.hitRate.label": "Taux de réussite du retrieval avec le reranker cross-encoder",
-  "stats.hybrid.value": "+9 pts",
-  "stats.hybrid.label": "Gain de taux de réussite du retrieval hybride dense + BM25",
-  "stats.separation.value": "100 %",
-  "stats.separation.label": "Séparation du seuil entre questions du cours et hors-cours",
-  "stats.faithfulness.value": "75 %",
-  "stats.faithfulness.label": "Fidélité sur le juge LLM hors-ligne",
-  "stats.local.value": "0 €",
-  "stats.local.label": "Option entièrement locale — embeddings, reranker et store hors-ligne",
+    "Chaque réponse vient de vos propres cours et indique sa source — pour réviser sans douter.",
+  "stats.cited.value": "100 %",
+  "stats.cited.label": "Réponses citées — jamais inventées",
+  "stats.fromCourse.value": "82 %",
+  "stats.fromCourse.label": "Questions répondues directement depuis vos cours",
+  "stats.tools.value": "8",
+  "stats.tools.label": "Façons de réviser : demander, quiz, exercices, correction…",
+  "stats.free.value": "0 €",
+  "stats.free.label": "Pour commencer — sans carte bancaire",
 
   // How it works
   "how.eyebrow": "Comment ça marche",
   "how.title": "De votre cours à une réponse citée",
   "how.subtitle":
-    "Trois étapes, des slides brutes à une réponse fiable — indexez une fois, demandez tout, obtenez la source.",
-  "how.step1.title": "Indexez votre cours une fois",
+    "Trois étapes, de vos slides à une réponse fiable — ajoutez une fois, demandez tout, obtenez la source.",
+  "how.step1.title": "Ajoutez votre cours",
   "how.step1.body":
-    "Ajoutez vos slides, exercices et notes. Ils sont analysés en tenant compte des maths et stockés dans une base de connaissances privée et interrogeable.",
-  "how.step2.title": "Posez vos questions en langage naturel",
+    "Déposez vos slides, notes et exercices. Ils deviennent un espace privé que seul votre tuteur peut consulter.",
+  "how.step2.title": "Posez vos questions",
   "how.step2.body":
-    "Interrogez-le comme vous le feriez avec un tuteur. La récupération trouve les passages les plus pertinents de votre propre matériel.",
-  "how.step3.title": "Obtenez une réponse citée — ou un refus",
+    "Demandez comme à un tuteur. Il retrouve les passages les plus pertinents directement dans votre matériel.",
+  "how.step3.title": "Une réponse citée, ou un refus",
   "how.step3.body":
-    "Les réponses indiquent la source exacte (cours, page). Si le cours ne le couvre pas, le tuteur le dit au lieu de deviner.",
+    "Chaque réponse indique sa source exacte. Si votre cours ne le couvre pas, le tuteur le dit au lieu de deviner.",
 
   // Features
   "features.eyebrow": "Ce qui le distingue",
-  "features.title": "Conçu pour la confiance, pas seulement l'aide",
+  "features.title": "Des réponses fiables, à chaque fois",
   "features.subtitle":
-    "Chaque choix de conception sert une règle : rester dans votre matériel de cours, et le prouver à chaque réponse.",
-  "features.cited.title": "Citations par construction",
+    "Chaque réponse vient de votre cours et indique sa source — pour réviser l'esprit tranquille.",
+  "features.cited.title": "Chaque réponse cite sa source",
   "features.cited.body":
-    "Les sources sont mappées dans le code, pas écrites par le modèle — une citation ne peut donc jamais pointer vers une page inventée.",
-  "features.refusal.title": "Garde-fou anti-hallucination",
+    "Vous voyez toujours d'où vient la réponse : le cours, le chapitre, la page. Jamais de réponse sortie de nulle part.",
+  "features.refusal.title": "Il refuse plutôt que d'inventer",
   "features.refusal.body":
-    "Un seuil de similarité et une vérification de fidélité font refuser au tuteur tout ce que le cours n'étaye pas.",
-  "features.retrieval.title": "Récupération avancée",
+    "Si la réponse n'est pas dans votre cours, le tuteur le dit honnêtement au lieu de deviner.",
+  "features.retrieval.title": "Il trouve le bon passage",
   "features.retrieval.body":
-    "Une recherche basée sur un seuil avec un reranker cross-encoder optionnel fait remonter le bon passage avant de répondre.",
-  "features.private.title": "Privé par défaut",
+    "Posez votre question normalement : le tuteur retrouve l'extrait exact de votre cours qui y répond.",
+  "features.private.title": "Vos cours restent privés",
   "features.private.body":
-    "Des embeddings multilingues locaux et un vector store auto-hébergé gardent votre matériel de cours sur votre propre infrastructure.",
-  "features.quiz.title": "Quiz et répétition espacée",
+    "Votre matériel reste à vous — rien n'est partagé ni réutilisé ailleurs.",
+  "features.quiz.title": "Entraînez-vous et révisez",
   "features.quiz.body":
-    "Générez des exercices et des quiz ancrés, puis planifiez la révision des notions au bon moment.",
-  "features.bilingual.title": "Bilingue",
+    "Générez des exercices et des quiz sur vos cours, et révisez chaque notion au bon moment.",
+  "features.bilingual.title": "Multilingue",
   "features.bilingual.body":
-    "Fonctionne avec du matériel de cours en anglais et en français, avec une interface entièrement bilingue.",
+    "Fonctionne avec vos cours en français, anglais et néerlandais.",
   // Mini visual inside the highlighted bento tile.
-  "features.cited.demo.answer": "…l'intégrale d'admissibilité reste finie",
-  "features.cited.demo.chip": "(Wavelet Transform, p.57)",
-  // Inline detail pills inside the refusal-guard tile.
-  "features.refusal.pill.threshold": "seuil de similarité",
-  "features.refusal.pill.faithfulness": "contrôle de fidélité",
+  "features.cited.demo.answer": "…donc a² + b² = c²",
+  "features.cited.demo.chip": "(Mathématiques, Chap. 3, p.21)",
 
   // Landing CTA / footer
   "landing.cta.title": "Prêt à réviser à partir de votre propre cours ?",
@@ -489,7 +453,7 @@ const fr: Record<TranslationKey, string> = {
   "footer.link.how": "Comment ça marche",
   "footer.link.features": "Fonctionnalités",
   "footer.link.tool": "Ouvrir le tuteur",
-  "footer.credit": "grounded-rag — réalisé par mathisdelsart.",
+  "footer.credit": "Sourcio — réalisé par Mathis Delsart.",
 
   // Tabs
   "tabs.aria": "Sections du tuteur",
@@ -553,9 +517,12 @@ const fr: Record<TranslationKey, string> = {
   "ask.title": "Poser une question",
   "ask.description":
     "Les réponses proviennent strictement de votre matériel de cours indexé.",
+  // Exemple pré-rempli (identique au hero) pour que l'outil soit clair d'emblée.
+  "ask.example.question": "Que dit le théorème de Pythagore ?",
+  "ask.example.course": "Mathématiques",
+  "ask.example.chapter": "Chapitre 3",
   "ask.questionLabel": "Question",
-  "ask.questionPlaceholder":
-    "ex. Quelle est la condition d'admissibilité pour une ondelette ?",
+  "ask.questionPlaceholder": "ex. Que dit le théorème de Pythagore ?",
   "ask.courseLabel": "Filtre par cours",
   "ask.courseHint": "Optionnel — restreindre la récupération à un seul cours.",
   "ask.coursePlaceholder": "ex. ELEC2885 Wavelet Transform",
@@ -724,19 +691,347 @@ const fr: Record<TranslationKey, string> = {
   "common.loading": "Chargement",
 };
 
-const DICTIONARIES: Record<Locale, Record<TranslationKey, string>> = { en, fr };
+/** Dutch dictionary. Same keys as `en`; values are translations. */
+const nl: Record<TranslationKey, string> = {
+  // Header / chrome
+  "app.name": "Sourcio",
+  "app.tagline": "Antwoorden alleen uit je cursus",
+  "header.signIn": "Inloggen",
 
-/** Pick a sensible default locale from the browser language (fr → fr, else en). */
+  // Language toggle
+  "lang.label": "Taal",
+
+  // Hero
+  "hero.description":
+    "Indexeer je slides en notities één keer en stel daarna je vragen in gewone taal. Elk antwoord is onderbouwd met een bronvermelding, of wordt eerlijk geweigerd als de cursus het niet behandelt.",
+  "hero.cta": "Probeer het",
+  "hero.ctaAria": "Scroll naar de tutor",
+  "hero.principles": "Kernprincipes",
+  "hero.headline.lead": "Een AI-tutor verankerd in je cursus —",
+  "hero.headline.accent": "altijd geciteerd, nooit verzonnen.",
+  "hero.badge.cited": "Altijd geciteerd",
+  "hero.badge.refuses": "Nooit verzonnen",
+  "hero.badge.fromCourse": "Uit je eigen cursussen",
+  "hero.badge.verifiable": "100% verifieerbaar",
+  "hero.preview.question": "Wat zegt de stelling van Pythagoras?",
+  "hero.preview.answer":
+    "In een rechthoekige driehoek is het kwadraat van de schuine zijde gelijk aan de som van de kwadraten van de twee andere zijden: a² + b² = c².",
+  "hero.preview.citation": "(Wiskunde, H. 3, p.21)",
+  "hero.preview.refusal": "Niet in het cursusmateriaal.",
+  "hero.app.context": "Wiskunde · Hoofdstuk 3",
+  "hero.app.tab.ask": "Vragen",
+  "hero.app.tab.exercise": "Oefening",
+  "hero.app.tab.grade": "Beoordelen",
+  "hero.app.answered": "Beantwoord vanuit je materiaal",
+  "hero.app.refusalQuestion": "Wat voor weer wordt het morgen?",
+
+  // Stats band
+  "stats.eyebrow": "Waarom studenten erop vertrouwen",
+  "stats.title": "Gebouwd voor antwoorden waarop je kunt bouwen",
+  "stats.subtitle":
+    "Elk antwoord komt uit je eigen cursussen en toont waar het vandaan komt — zodat je kunt studeren zonder te twijfelen.",
+  "stats.cited.value": "100%",
+  "stats.cited.label": "Antwoorden geciteerd — nooit verzonnen",
+  "stats.fromCourse.value": "82%",
+  "stats.fromCourse.label": "Vragen rechtstreeks beantwoord vanuit je eigen cursussen",
+  "stats.tools.value": "8",
+  "stats.tools.label": "Manieren om te studeren: vragen, quiz, oefenen, beoordelen en meer",
+  "stats.free.value": "0 €",
+  "stats.free.label": "Om te beginnen — geen creditcard nodig",
+
+  // How it works
+  "how.eyebrow": "Hoe het werkt",
+  "how.title": "Van je cursus naar een geciteerd antwoord",
+  "how.subtitle":
+    "Drie stappen van ruwe slides naar een betrouwbaar antwoord — voeg één keer toe, vraag alles, krijg de bron.",
+  "how.step1.title": "Voeg je cursus toe",
+  "how.step1.body":
+    "Zet je slides, notities en oefeningen erin. Ze worden een privéruimte die alleen je tutor kan lezen.",
+  "how.step2.title": "Stel je vragen",
+  "how.step2.body":
+    "Vraag zoals je het een tutor zou vragen. Het haalt de meest relevante passages rechtstreeks uit je eigen materiaal.",
+  "how.step3.title": "Een geciteerd antwoord, of een weigering",
+  "how.step3.body":
+    "Elk antwoord toont zijn exacte bron. Als je cursus het niet behandelt, zegt de tutor dat in plaats van te gokken.",
+
+  // Features
+  "features.eyebrow": "Wat het anders maakt",
+  "features.title": "Betrouwbare antwoorden, elke keer",
+  "features.subtitle":
+    "Elk antwoord komt uit je cursus en toont zijn bron — zodat je met een gerust hart kunt studeren.",
+  "features.cited.title": "Elk antwoord vermeldt zijn bron",
+  "features.cited.body":
+    "Je ziet altijd waar een antwoord vandaan komt — de cursus, het hoofdstuk, de pagina. Nooit een antwoord uit het niets.",
+  "features.refusal.title": "Het weigert liever dan te verzinnen",
+  "features.refusal.body":
+    "Als het antwoord niet in je cursus staat, zegt de tutor dat eerlijk in plaats van te gokken.",
+  "features.retrieval.title": "Het vindt de juiste passage",
+  "features.retrieval.body":
+    "Vraag in gewone taal en de tutor haalt het exacte fragment uit je cursus dat je antwoord geeft.",
+  "features.private.title": "Je cursussen blijven privé",
+  "features.private.body":
+    "Je materiaal blijft van jou — niets wordt gedeeld of elders hergebruikt.",
+  "features.quiz.title": "Oefen en herhaal",
+  "features.quiz.body":
+    "Genereer oefeningen en quizzen uit je cursussen, en herhaal elk begrip op het juiste moment.",
+  "features.bilingual.title": "Meertalig",
+  "features.bilingual.body": "Werkt met je cursussen in het Frans, Engels en Nederlands.",
+  "features.cited.demo.answer": "…dus a² + b² = c²",
+  "features.cited.demo.chip": "(Wiskunde, H. 3, p.21)",
+
+  // Landing CTA / footer
+  "landing.cta.title": "Klaar om vanuit je eigen cursus te studeren?",
+  "landing.cta.body":
+    "Geen installatie om tot hier te lezen. Open de tutor hieronder, richt hem op je materiaal en stel je eerste vraag.",
+  "landing.cta.button": "Begin nu",
+  "landing.footer.tagline":
+    "Een AI-tutor strikt verankerd in je cursus — geciteerd, of eerlijk over wat hij niet kan beantwoorden.",
+  "footer.explore": "Ontdek",
+  "footer.link.how": "Hoe het werkt",
+  "footer.link.features": "Functies",
+  "footer.link.tool": "Open de tutor",
+  "footer.credit": "Sourcio — gemaakt door Mathis Delsart.",
+
+  // Tabs
+  "tabs.aria": "Tutor-secties",
+  "tabs.ask": "Vragen",
+  "tabs.reexplain": "Heruitleggen",
+  "tabs.exercise": "Oefening",
+  "tabs.grade": "Beoordelen",
+  "tabs.quiz": "Quiz",
+  "tabs.threads": "Gesprekken",
+  "tabs.history": "Geschiedenis",
+  "tabs.review": "Herhaling",
+
+  // Health badge
+  "health.online": "Backend online",
+  "health.offline": "Backend offline",
+  "health.checking": "Controleren…",
+
+  // Auth menu
+  "auth.aria": "Account",
+  "auth.signIn": "Inloggen",
+  "auth.register": "Registreren",
+  "auth.signOut": "Uitloggen",
+  "auth.createAccount": "Account aanmaken",
+  "auth.signedInAs": "Ingelogd als",
+  "auth.email": "E-mail",
+  "auth.password": "Wachtwoord",
+  "auth.passwordHint": "Minstens 8 tekens.",
+  "auth.accountCreated": "Account aangemaakt. Je wordt ingelogd…",
+  "auth.signedInToast": "Ingelogd als {email}.",
+  "auth.signedOutToast": "Uitgelogd.",
+  "auth.failed": "Authenticatie mislukt.",
+
+  // Settings panel
+  "settings.title": "Instellingen",
+  "settings.studentId": "Student-id",
+  "settings.studentIdHint": "Identificeert je bij de tutor. Bewaard in deze browser.",
+  "settings.baseUrl": "API-basis-URL",
+  "settings.baseUrlHint": "Overschrijft NEXT_PUBLIC_API_BASE_URL. Laat leeg voor de standaardwaarde.",
+  "settings.apiKey": "API-sleutel",
+  "settings.apiKeyHint": "Optioneel — verzonden als de X-API-Key-header indien ingesteld.",
+  "settings.apiKeyPlaceholder": "(geen)",
+  "common.cancel": "Annuleren",
+  "common.save": "Opslaan",
+
+  // Shared
+  "common.requestFailed": "Verzoek mislukt.",
+  "common.submitHint": "Druk op ⌘/Ctrl + Enter om te verzenden.",
+  "common.sources": "Bronnen",
+  "common.noSources": "Geen bronnen geciteerd.",
+  "refusal.title": "Geweigerd — niet behandeld in de cursus",
+
+  // Level selector
+  "level.aria": "Niveau van heruitleg",
+  "level.beginner": "beginner",
+  "level.intermediate": "gemiddeld",
+  "level.advanced": "gevorderd",
+
+  // Ask panel
+  "ask.title": "Stel een vraag",
+  "ask.description": "Antwoorden komen strikt uit je geïndexeerde cursusmateriaal.",
+  "ask.example.question": "Wat zegt de stelling van Pythagoras?",
+  "ask.example.course": "Wiskunde",
+  "ask.example.chapter": "Hoofdstuk 3",
+  "ask.questionLabel": "Vraag",
+  "ask.questionPlaceholder": "bijv. Wat zegt de stelling van Pythagoras?",
+  "ask.courseLabel": "Cursusfilter",
+  "ask.courseHint": "Optioneel — beperk tot één cursus.",
+  "ask.coursePlaceholder": "bijv. ELEC2885 Wavelet Transform",
+
+  // Course picker
+  "course.allCourses": "Alle cursussen",
+  "course.loading": "Cursussen laden…",
+  "course.fetchFailed": "Kon cursussen niet laden — voer een cursusnaam in.",
+  "ask.chapterLabel": "Hoofdstukfilter",
+  "ask.chapterHint": "Optioneel — beperk tot één hoofdstuk.",
+  "ask.chapterPlaceholder": "bijv. Hoofdstuk 3",
+  "ask.kLabel": "Op te halen bronnen:",
+  "ask.submit": "Vragen",
+  "ask.answerTitle": "Antwoord",
+  "ask.empty.title": "Nog geen antwoord",
+  "ask.empty.description": "Stel hierboven een vraag voor een onderbouwde, geciteerde uitleg.",
+  "ask.reexplainPrompt": "Niet begrepen? Leg opnieuw uit op niveau:",
+  "ask.reexplain": "Heruitleggen",
+
+  // Answer feedback
+  "feedback.prompt": "Was dit antwoord nuttig?",
+  "feedback.up": "Nuttig",
+  "feedback.upAria": "Markeer dit antwoord als nuttig",
+  "feedback.down": "Niet nuttig",
+  "feedback.downAria": "Markeer dit antwoord als niet nuttig",
+  "feedback.notePlaceholder": "Optioneel: wat klopte er niet?",
+  "feedback.send": "Feedback verzenden",
+  "feedback.thanks": "Bedankt voor je feedback.",
+  "feedback.failed": "Kon feedback niet verzenden.",
+
+  // Re-explain panel
+  "reexplain.title": "Leg het laatste antwoord opnieuw uit",
+  "reexplain.description": "Hoor je meest recente antwoord opnieuw, afgestemd op een ander niveau.",
+  "reexplain.lastAnswer": "Laatste antwoord",
+  "reexplain.action": "Heruitleggen",
+  "reexplain.resultTitle": "Heruitleg",
+  "reexplain.empty.title": "Nog niets heruitgelegd",
+  "reexplain.empty.description":
+    "Kies een niveau en druk op Heruitleggen. Stel eerst een vraag als je dat nog niet hebt gedaan.",
+
+  // Exercise panel
+  "exercise.title": "Genereer een oefening",
+  "exercise.description": "Een oefenprobleem verankerd in de cursus, met diens notatie.",
+  "exercise.notionLabel": "Te oefenen begrip",
+  "exercise.notionPlaceholder": "bijv. continue wavelettransformatie",
+  "exercise.generate": "Genereren",
+  "exercise.resultTitle": "Oefening",
+  "exercise.empty.title": "Nog geen oefening",
+  "exercise.empty.description":
+    "Voer hierboven een begrip in om een op de cursus gebaseerd probleem te genereren.",
+  "exercise.solveHint":
+    "Los het op en ga naar het tabblad Beoordelen — je antwoord is gekoppeld aan deze oefening.",
+
+  // Grade panel
+  "grade.title": "Beoordeel je antwoord",
+  "grade.description": "Een LLM-jury beoordeelt je antwoord en legt uit waarom.",
+  "grade.against": "Beoordeling t.o.v. oefening #{id}",
+  "grade.answerLabel": "Jouw antwoord",
+  "grade.answerPlaceholder": "Schrijf hier je oplossing…",
+  "grade.submit": "Beoordelen",
+  "grade.verdictTitle": "Oordeel",
+  "grade.empty.title": "Nog niet beoordeeld",
+  "grade.empty.description": "Dien hierboven een antwoord in voor een score en feedback.",
+  "grade.score": "Score",
+
+  // Quiz panel
+  "quiz.title": "Genereer een quiz",
+  "quiz.description": "Een reeks oefenvragen verankerd in de cursus, met diens notatie.",
+  "quiz.notionLabel": "Begrip om over te quizzen",
+  "quiz.notionPlaceholder": "bijv. continue wavelettransformatie",
+  "quiz.questions": "Vragen",
+  "quiz.generate": "Genereren",
+  "quiz.resultTitle": "Quiz",
+  "quiz.total": "Totaal {total}/100",
+  "quiz.empty.title": "Nog geen quiz",
+  "quiz.empty.description":
+    "Voer hierboven een begrip in om een op de cursus gebaseerde quiz te genereren.",
+  "quiz.refused": "Dit begrip wordt niet behandeld in het cursusmateriaal.",
+  "quiz.answerLabel": "Jouw antwoord",
+  "quiz.answerPlaceholder": "Schrijf hier je oplossing…",
+  "quiz.gradeAnswer": "Antwoord beoordelen",
+  "quiz.score": "Score",
+
+  // History panel
+  "history.title": "Gespreksgeschiedenis",
+  "history.description": "Je recente beurten met de tutor, oudste eerst.",
+  "history.refresh": "Vernieuwen",
+  "history.empty.title": "Nog geen geschiedenis",
+  "history.empty.description":
+    "Stel een vraag of genereer een oefening — je beurten verschijnen hier.",
+
+  // Threads (conversation sessions)
+  "threads.title": "Gesprekken",
+  "threads.description":
+    "Groepeer je vragen in gesprekken. Het actieve gesprek wordt gekoppeld aan nieuwe vragen op het tabblad Vragen.",
+  "threads.refresh": "Vernieuwen",
+  "threads.list.title": "Gesprekken",
+  "threads.new": "Nieuw gesprek",
+  "threads.newTitleLabel": "Gesprekstitel",
+  "threads.newTitlePlaceholder": "Optioneel — bijv. Wavelet-basis",
+  "threads.create": "Aanmaken",
+  "threads.created": "Gesprek aangemaakt.",
+  "threads.createFailed": "Kon het gesprek niet aanmaken.",
+  "threads.none": "Alle geschiedenis (zonder gesprek)",
+  "threads.noneHint": "Nieuwe vragen worden aan geen enkel gesprek gekoppeld.",
+  "threads.untitled": "Naamloos gesprek",
+  "threads.active": "Actief",
+  "threads.activeBanner": "Nieuwe vragen worden aan dit gesprek gekoppeld.",
+  "threads.select": "Selecteer gesprek {title}",
+  "threads.empty.title": "Nog geen gesprekken",
+  "threads.empty.description":
+    "Maak een gesprek om verwante vragen te groeperen, of blijf vragen zonder gesprek.",
+  "threads.messages.title": "Gespreksberichten",
+  "threads.messages.empty.title": "Nog geen berichten in dit gesprek",
+  "threads.messages.empty.description":
+    "Selecteer dit gesprek en stel een vraag op het tabblad Vragen om het te starten.",
+  "threads.loadFailed": "Kon gesprekken niet laden.",
+  "threads.messagesFailed": "Kon de berichten van het gesprek niet laden.",
+
+  // Review panel (spaced repetition)
+  "review.title": "Gespreide herhaling",
+  "review.description":
+    "Beoordeel hoe goed je elk begrip onthield. Je beoordeling plant het opnieuw op het juiste moment.",
+  "review.refresh": "Vernieuwen",
+  "review.dueTitle": "Nu te doen",
+  "review.dueCount": "{count} te doen",
+  "review.add.title": "Voeg een begrip toe",
+  "review.add.label": "Te herhalen begrip",
+  "review.add.placeholder": "bijv. continue wavelettransformatie",
+  "review.add.button": "Toevoegen",
+  "review.add.hint": "Voegt het begrip toe aan je herhalingswachtrij, direct te doen.",
+  "review.added": "“{notion}” toegevoegd aan je herhalingswachtrij.",
+  "review.rateLabel": "Hoe goed herinnerde je je dit?",
+  "review.rate.again": "Opnieuw",
+  "review.rate.hard": "Moeilijk",
+  "review.rate.good": "Goed",
+  "review.rate.easy": "Makkelijk",
+  "review.rate.againAria": "Beoordeel “{notion}” als vergeten",
+  "review.rate.hardAria": "Beoordeel “{notion}” als moeilijk",
+  "review.rate.goodAria": "Beoordeel “{notion}” als goed",
+  "review.rate.easyAria": "Beoordeel “{notion}” als makkelijk",
+  "review.rescheduled": "“{notion}” — volgende herhaling over {days}.",
+  "review.day": "1 dag",
+  "review.days": "{days} dagen",
+  "review.empty.title": "Niets te doen — goed gedaan.",
+  "review.empty.description": "Je bent helemaal bij. Voeg hierboven een begrip toe om het te volgen.",
+
+  // Export actions
+  "export.copy": "Kopiëren als Markdown",
+  "export.copyAria": "Kopieer antwoord en bronnen als Markdown",
+  "export.download": ".md downloaden",
+  "export.downloadAria": "Download antwoord en bronnen als Markdown-bestand",
+  "export.copied": "Gekopieerd naar klembord.",
+  "export.copyFailed": "Kon niet naar klembord kopiëren.",
+  "export.downloadStarted": "Download gestart.",
+  "export.downloadFailed": "Kon de download niet voorbereiden.",
+
+  // Misc
+  "common.loading": "Laden",
+};
+
+const DICTIONARIES: Record<Locale, Record<TranslationKey, string>> = { en, fr, nl };
+
+/** Pick a sensible default locale from the browser language (fr/nl → match, else en). */
 function detectLocale(): Locale {
   if (typeof navigator === "undefined") return "en";
   const lang = (navigator.language || "").toLowerCase();
-  return lang.startsWith("fr") ? "fr" : "en";
+  if (lang.startsWith("fr")) return "fr";
+  if (lang.startsWith("nl")) return "nl";
+  return "en";
 }
 
 /** Resolve the persisted locale, falling back to browser detection. */
 function resolveLocale(): Locale {
   const stored = readLocal(KEYS.locale);
-  if (stored === "en" || stored === "fr") return stored;
+  if (stored === "en" || stored === "fr" || stored === "nl") return stored;
   return detectLocale();
 }
 

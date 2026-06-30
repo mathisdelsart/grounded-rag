@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n";
 import { SectionIntro } from "@/components/SectionIntro";
+import { Reveal } from "@/components/Reveal";
 
 /** Stacked-layers icon — "index your course". */
 function IndexIcon() {
@@ -11,7 +12,7 @@ function IndexIcon() {
     <svg
       aria-hidden
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className="h-6 w-6"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.7}
@@ -31,7 +32,7 @@ function AskIcon() {
     <svg
       aria-hidden
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className="h-6 w-6"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.7}
@@ -49,7 +50,7 @@ function CitedIcon() {
     <svg
       aria-hidden
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className="h-6 w-6"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.7}
@@ -77,43 +78,43 @@ const STEPS: Step[] = [
 
 /**
  * Three concise steps as a horizontal stepper: numbered 01/02/03 nodes joined
- * by a thin connector line, each with a brand-tinted icon square. Collapses to
- * a vertical stack on mobile.
+ * by a thin connector line, each with a brand-tinted icon square that lifts and
+ * tilts on hover. Steps reveal one after another as the section scrolls in.
  */
 export function HowItWorks() {
   const { t } = useT();
   return (
     <section id="how" aria-labelledby="how-heading" className="scroll-mt-24 py-4">
-      <SectionIntro
-        eyebrow="how.eyebrow"
-        title="how.title"
-        subtitle="how.subtitle"
-        headingId="how-heading"
-      />
+      <Reveal>
+        <SectionIntro
+          eyebrow="how.eyebrow"
+          title="how.title"
+          subtitle="how.subtitle"
+          headingId="how-heading"
+        />
+      </Reveal>
 
       <ol className="relative mt-16 grid gap-12 sm:grid-cols-3 sm:gap-8">
         {/* Connector line behind the nodes (desktop only). */}
         <div
           aria-hidden
-          className="pointer-events-none absolute left-[16.67%] right-[16.67%] top-7 hidden h-px bg-gradient-to-r from-brand-200 via-brand-300 to-brand-200 dark:from-brand-900 dark:via-brand-800 dark:to-brand-900 sm:block"
+          className="pointer-events-none absolute left-[16.67%] right-[16.67%] top-8 hidden h-px bg-gradient-to-r from-brand-200 via-brand-400 to-brand-200 sm:block"
         />
         {STEPS.map((step, i) => (
-          <li key={step.title} className="group relative text-center">
+          <Reveal as="li" key={step.title} delay={i * 140} className="group relative text-center">
             <div className="flex justify-center">
-              <span className="relative z-10 inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-brand-200 bg-brand-50 text-brand-600 shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow-md dark:border-brand-900 dark:bg-brand-950 dark:text-brand-300">
+              <span className="relative z-10 inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white text-brand-600 shadow-sm transition duration-300 group-hover:-translate-y-1 group-hover:rotate-3 group-hover:shadow-lg group-hover:shadow-brand-500/20">
                 {step.icon}
-                <span className="absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[11px] font-bold tabular-nums text-white dark:bg-white dark:text-ink">
+                <span className="absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[11px] font-bold tabular-nums text-white shadow-sm">
                   {String(i + 1).padStart(2, "0")}
                 </span>
               </span>
             </div>
-            <h3 className="mt-6 text-lg font-semibold text-ink dark:text-zinc-100">
-              {t(step.title)}
-            </h3>
-            <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+            <h3 className="mt-6 text-lg font-semibold text-ink">{t(step.title)}</h3>
+            <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-zinc-600">
               {t(step.body)}
             </p>
-          </li>
+          </Reveal>
         ))}
       </ol>
     </section>

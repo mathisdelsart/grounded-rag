@@ -3,6 +3,7 @@
 import { useT } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n";
 import { SectionIntro } from "@/components/SectionIntro";
+import { CountUp } from "@/components/CountUp";
 
 interface Stat {
   value: TranslationKey;
@@ -10,20 +11,19 @@ interface Stat {
 }
 
 /**
- * Real, measured figures only — every number is taken verbatim from the
- * README metrics table (retrieval hit-rate, hybrid gain, threshold
- * separation, faithfulness) plus the fully-local zero-cost option.
+ * Benefit-first figures (no internal jargon): every answer is cited, answers
+ * come from the user's own courses, the full toolset, and the free start. The
+ * numbers count up the first time the band scrolls into view.
  */
 const STATS: Stat[] = [
-  { value: "stats.hitRate.value", label: "stats.hitRate.label" },
-  { value: "stats.hybrid.value", label: "stats.hybrid.label" },
-  { value: "stats.separation.value", label: "stats.separation.label" },
-  { value: "stats.faithfulness.value", label: "stats.faithfulness.label" },
-  { value: "stats.local.value", label: "stats.local.label" },
+  { value: "stats.cited.value", label: "stats.cited.label" },
+  { value: "stats.fromCourse.value", label: "stats.fromCourse.label" },
+  { value: "stats.tools.value", label: "stats.tools.label" },
+  { value: "stats.free.value", label: "stats.free.label" },
 ];
 
 /**
- * Full-width navy band with big bold stat figures and small labels, lit by a
+ * Full-width navy band with big bold stat figures and short labels, lit by a
  * subtle brand radial glow. Breaks out of the centered landing column.
  */
 export function StatsBand() {
@@ -48,15 +48,15 @@ export function StatsBand() {
         />
 
         {/* Thin vertical dividers separate the figures on wider viewports. */}
-        <dl className="mt-14 grid grid-cols-2 gap-y-12 sm:grid-cols-3 lg:grid-cols-5 lg:divide-x lg:divide-white/10">
+        <dl className="mt-14 grid grid-cols-2 gap-y-12 lg:grid-cols-4 lg:divide-x lg:divide-white/10">
           {STATS.map((stat) => (
             <div key={stat.value} className="px-4 text-center sm:px-6">
               <dt className="sr-only">{t(stat.label)}</dt>
               <dd>
                 <span className="block text-4xl font-bold tracking-tight text-white tabular-nums sm:text-5xl">
-                  {t(stat.value)}
+                  <CountUp value={t(stat.value)} />
                 </span>
-                <span className="mx-auto mt-3 block max-w-[16rem] text-sm leading-snug text-zinc-400">
+                <span className="mx-auto mt-3 block max-w-[16rem] text-sm leading-snug text-zinc-300">
                   {t(stat.label)}
                 </span>
               </dd>

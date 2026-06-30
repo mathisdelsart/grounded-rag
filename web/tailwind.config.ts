@@ -43,6 +43,17 @@ const config: Config = {
           900: "#363f88",
           950: "#222650",
         },
+        // Warm off-white surface for the "product" section (was a raw hex).
+        paper: "#f6f6f3",
+        // Tokenized success accent — replaces ad-hoc greens in the hero/feedback
+        // so the "grounded / answered" affirmative reads consistently everywhere.
+        success: {
+          50: "#e7f6ef",
+          100: "#d2efe1",
+          500: "#10916a",
+          600: "#0f7a52",
+          700: "#0c6344",
+        },
       },
       boxShadow: {
         card: "0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.03)",
