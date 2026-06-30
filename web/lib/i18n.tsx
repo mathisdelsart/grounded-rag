@@ -273,6 +273,9 @@ const en = {
   "quiz.answerPlaceholder": "Write your solution here…",
   "quiz.gradeAnswer": "Grade answer",
   "quiz.score": "Score",
+  "quiz.gradeAll": "Grade all",
+  "quiz.finalScore": "Final score",
+  "quiz.recommendationTitle": "Recommendation",
 
   // History panel
   "history.title": "Conversation history",
@@ -626,6 +629,9 @@ const fr: Record<TranslationKey, string> = {
   "quiz.answerPlaceholder": "Rédigez votre solution ici…",
   "quiz.gradeAnswer": "Corriger la réponse",
   "quiz.score": "Note",
+  "quiz.gradeAll": "Tout corriger",
+  "quiz.finalScore": "Note finale",
+  "quiz.recommendationTitle": "Recommandation",
 
   // History panel
   "history.title": "Historique de conversation",
@@ -963,6 +969,9 @@ const nl: Record<TranslationKey, string> = {
   "quiz.answerPlaceholder": "Schrijf hier je oplossing…",
   "quiz.gradeAnswer": "Antwoord beoordelen",
   "quiz.score": "Score",
+  "quiz.gradeAll": "Alles beoordelen",
+  "quiz.finalScore": "Eindscore",
+  "quiz.recommendationTitle": "Aanbeveling",
 
   // History panel
   "history.title": "Gespreksgeschiedenis",

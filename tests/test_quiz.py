@@ -13,7 +13,7 @@ pytest.importorskip("sqlalchemy")
 from sqlalchemy import create_engine, select  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
-from agent.nodes.quiz import generate_quiz, grade_quiz_answer  # noqa: E402
+from agent.nodes.quiz import generate_quiz, grade_quiz_answer, summarize_quiz  # noqa: E402
 from db.models import Grade, Quiz, QuizQuestion  # noqa: E402
 from db.session import configure_session_factory, get_session, init_db  # noqa: E402
 
@@ -210,6 +210,86 @@ def test_grade_quiz_answer_uses_stored_reference(engine, monkeypatch):
     grade_quiz_answer(quiz_id, question_id, "some answer", "zoe")
     # The stored reference solution for question 0 was "By axiom 1.".
     assert "By axiom 1." in captured["human"]
+
+
+def test_summarize_quiz_averages_and_recommends(engine, monkeypatch):
+    _patch_retrieve(monkeypatch, _make_retrieved("Group axioms."))
+    _patch_llm(monkeypatch, _TWO_QUESTIONS)
+    result = generate_quiz("groups", 2, "zoe")
+    quiz_id = result["quiz_id"]
+    q0 = result["questions"][0]["id"]
+    q1 = result["questions"][1]["id"]
+
+    # The judge (grade node) scores every answer the same; the recommendation LLM
+    # (quiz node) returns a fixed study tip.
+    monkeypatch.setattr(
+        "agent.nodes.grade.get_llm",
+        lambda role="default": _FakeLLM('{"score": 80, "feedback": "Good."}'),
+    )
+    monkeypatch.setattr(
+        "agent.nodes.quiz.get_llm",
+        lambda role="default": _FakeLLM("Revise the group axioms."),
+    )
+
+    summary = summarize_quiz(
+        quiz_id,
+        [{"question_id": q0, "answer": "a0"}, {"question_id": q1, "answer": "a1"}],
+        "zoe",
+    )
+
+    assert summary["total"] == 80
+    assert [r["question_id"] for r in summary["results"]] == [q0, q1]
+    assert all(r["score"] == 80 for r in summary["results"])
+    assert summary["recommendation"] == "Revise the group axioms."
+
+    # Each answer was graded and persisted as a grade row.
+    with get_session(engine) as session:
+        assert len(list(session.scalars(select(Grade)))) == 2
+
+
+def test_summarize_quiz_skips_unknown_questions(engine, monkeypatch):
+    _patch_retrieve(monkeypatch, _make_retrieved("Group axioms."))
+    _patch_llm(monkeypatch, _TWO_QUESTIONS)
+    result = generate_quiz("groups", 2, "zoe")
+    quiz_id = result["quiz_id"]
+    q0 = result["questions"][0]["id"]
+
+    monkeypatch.setattr(
+        "agent.nodes.grade.get_llm",
+        lambda role="default": _FakeLLM('{"score": 60, "feedback": "ok"}'),
+    )
+    monkeypatch.setattr(
+        "agent.nodes.quiz.get_llm",
+        lambda role="default": _FakeLLM("Keep practising."),
+    )
+
+    # One valid answer plus one for a nonexistent question id: the latter is
+    # skipped and the average is computed over the graded question only.
+    summary = summarize_quiz(
+        quiz_id,
+        [{"question_id": q0, "answer": "a0"}, {"question_id": 99999, "answer": "x"}],
+        "zoe",
+    )
+
+    assert summary["total"] == 60
+    assert [r["question_id"] for r in summary["results"]] == [q0]
+
+
+def test_summarize_quiz_without_graded_questions_has_no_recommendation(engine, monkeypatch):
+    _patch_retrieve(monkeypatch, _make_retrieved("Group axioms."))
+    _patch_llm(monkeypatch, _TWO_QUESTIONS)
+    result = generate_quiz("groups", 2, "zoe")
+    quiz_id = result["quiz_id"]
+
+    # No recommendation LLM call should be made when nothing can be graded.
+    def _boom(role="default"):
+        raise AssertionError("recommendation LLM must not be called")
+
+    monkeypatch.setattr("agent.nodes.quiz.get_llm", _boom)
+
+    summary = summarize_quiz(quiz_id, [{"question_id": 99999, "answer": "x"}], "zoe")
+
+    assert summary == {"total": 0, "results": [], "recommendation": ""}
 
 
 def test_grade_quiz_answer_unknown_question_returns_none(engine, monkeypatch):

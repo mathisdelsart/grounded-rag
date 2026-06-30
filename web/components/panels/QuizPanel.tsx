@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 import {
   quiz as fetchQuiz,
   gradeQuizAnswer,
+  gradeQuizAll,
   type ConnectionConfig,
   type GradeResponse,
   type QuizResponse,
+  type QuizSummaryResponse,
 } from "@/lib/api";
 import { Card, CardBody, CardHeader } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -50,7 +52,19 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
   const [verdicts, setVerdicts] = useState<Record<number, GradeResponse>>({});
   const [grading, setGrading] = useState<Record<number, boolean>>({});
 
+  // Whole-quiz grading: a final score plus a global recommendation.
+  const [summary, setSummary] = useState<QuizSummaryResponse | null>(null);
+  const [gradingAll, setGradingAll] = useState(false);
+
   const canGenerate = notion.trim().length > 0 && !loading;
+
+  const hasAnyAnswer = useMemo(
+    () =>
+      (result?.questions ?? []).some(
+        (q) => q.id != null && (answers[q.id] ?? "").trim().length > 0,
+      ),
+    [result, answers],
+  );
 
   const gradedScores = useMemo(
     () => Object.values(verdicts).map((v) => clampScore(v.score)),
@@ -67,6 +81,7 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
     setAnswers({});
     setVerdicts({});
     setGrading({});
+    setSummary(null);
     try {
       const data = await fetchQuiz(studentId, notion.trim(), count, config);
       setResult(data);
@@ -95,6 +110,38 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
       toast.push(err instanceof Error ? err.message : t("common.requestFailed"), "error");
     } finally {
       setGrading((g) => ({ ...g, [questionId]: false }));
+    }
+  }
+
+  async function gradeAll() {
+    if (!result?.quiz_id || gradingAll) return;
+    const quizId = result.quiz_id;
+    const payload = result.questions
+      .map((q) => ({
+        question_id: q.id,
+        answer: (q.id != null ? (answers[q.id] ?? "") : "").trim(),
+      }))
+      .filter(
+        (a): a is { question_id: number; answer: string } =>
+          a.question_id != null && a.answer.length > 0,
+      );
+    if (payload.length === 0) return;
+    setGradingAll(true);
+    try {
+      const data = await gradeQuizAll(studentId, quizId, payload, config);
+      setSummary(data);
+      // Reflect per-question scores in the existing per-question cards.
+      setVerdicts((v) => {
+        const next = { ...v };
+        for (const r of data.results) {
+          next[r.question_id] = { score: r.score, feedback: r.feedback };
+        }
+        return next;
+      });
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : t("common.requestFailed"), "error");
+    } finally {
+      setGradingAll(false);
     }
   }
 
@@ -241,8 +288,54 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
               })}
             </ol>
           )}
+          {result && !result.refused && result.questions.length > 0 && (
+            <div className="mt-6 flex justify-end border-t border-zinc-100 pt-4 dark:border-zinc-800">
+              <Button
+                loading={gradingAll}
+                disabled={!hasAnyAnswer || gradingAll}
+                onClick={gradeAll}
+              >
+                {t("quiz.gradeAll")}
+              </Button>
+            </div>
+          )}
         </CardBody>
       </Card>
+
+      {summary && (
+        <Card>
+          <CardHeader title={t("quiz.finalScore")} />
+          <CardBody className="space-y-4">
+            <div className="space-y-1.5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t("quiz.score")}
+                </span>
+                <span className="text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                  {clampScore(summary.total)}/100
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    scoreTone(clampScore(summary.total)),
+                  )}
+                  style={{ width: `${clampScore(summary.total)}%` }}
+                />
+              </div>
+            </div>
+            {summary.recommendation.trim().length > 0 && (
+              <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                <h3 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  {t("quiz.recommendationTitle")}
+                </h3>
+                <Markdown>{summary.recommendation}</Markdown>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }
