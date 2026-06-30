@@ -17,6 +17,7 @@ import { StatsBand } from "@/components/StatsBand";
 import { LandingCta } from "@/components/LandingCta";
 import { Reveal } from "@/components/Reveal";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { ThreadSelect } from "@/components/ThreadSelect";
 import { AskPanel } from "@/components/panels/AskPanel";
 import { ExercisePanel } from "@/components/panels/ExercisePanel";
 import { QuizPanel } from "@/components/panels/QuizPanel";
@@ -225,6 +226,16 @@ export default function Home() {
                   baseUrl={baseUrl}
                   apiKey={apiKey}
                   onSave={saveSettings}
+                />
+
+                {/* Thread switcher in the tool frame — visible on every tab so
+                    the active conversation thread can be seen and changed from
+                    anywhere, sharing the page's activeSessionId/selectSession. */}
+                <ThreadSelect
+                  studentId={studentId}
+                  config={config}
+                  value={activeSessionId}
+                  onChange={selectSession}
                 />
 
                 <Tabs tabs={TABS} active={active} onChange={setActive} />
