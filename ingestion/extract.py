@@ -297,7 +297,10 @@ def extract_pdf(
     for page_no in order:
         page = doc[page_no - 1]
         if hybrid and not needs_vision(_page_features(page)):
-            plain[page_no] = page.get_text().strip()
+            # Default mode returns a str; guard keeps the type checker honest
+            # against PyMuPDF's broad get_text() overloads.
+            text = page.get_text()
+            plain[page_no] = (text if isinstance(text, str) else "").strip()
         else:
             vision_jobs.append((page_no, _render_page(page, dpi)))
 
