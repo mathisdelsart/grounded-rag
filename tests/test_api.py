@@ -70,6 +70,7 @@ def test_ask_returns_grounded_answer_and_sources(client, monkeypatch):
         "answer": "A wavelet is ... (Course, p.11)",
         "refused": False,
         "sources": ["(Course, p.11)"],
+        "citations": [],
     }
     # The request reached the grounded function with its parameters intact.
     assert captured == {"question": "What is a wavelet?", "k": 3}
@@ -394,6 +395,7 @@ def test_ask_stream_streams_tokens_then_sources(client, monkeypatch):
     assert events[-1] == {
         "type": "sources",
         "sources": ["(Course, p.11)"],
+        "citations": [],
         "refused": False,
     }
     assert captured == {"question": "What is a wavelet?", "k": 3}
@@ -437,7 +439,7 @@ def test_ask_stream_surfaces_refusal(client, monkeypatch):
     assert response.status_code == 200
     events = _parse_sse(response.text)
     assert events[0] == {"type": "token", "text": refusal}
-    assert events[-1] == {"type": "sources", "sources": [], "refused": True}
+    assert events[-1] == {"type": "sources", "sources": [], "citations": [], "refused": True}
 
     # The refusal text is persisted as the assistant turn.
     history = client.get("/history/s1").json()

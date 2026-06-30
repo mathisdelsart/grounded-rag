@@ -43,12 +43,14 @@ export function AskPanel({
 }: AskPanelProps) {
   const toast = useToast();
   const { t } = useT();
-  // Pre-filled with the same simple example shown in the hero, so the tool is
-  // immediately understandable; the user can clear it and ask their own.
+  // Pre-fill only the question with the hero example so the tool is instantly
+  // clear. The course/chapter filters stay empty so retrieval searches every
+  // indexed course — pre-setting them to the example's course would filter out
+  // everything when a different course is indexed.
   const [question, setQuestion] = useState(() => t("ask.example.question"));
   // Lazy-init from localStorage so the last chosen course survives a reload.
-  const [course, setCourse] = useState(() => readLocal(KEYS.course) || t("ask.example.course"));
-  const [chapter, setChapter] = useState(() => t("ask.example.chapter"));
+  const [course, setCourse] = useState(() => readLocal(KEYS.course));
+  const [chapter, setChapter] = useState("");
   const [k, setK] = useState(5);
   const [loading, setLoading] = useState(false);
   /** Text accumulated from the live token stream, before the final event lands. */
@@ -88,7 +90,12 @@ export function AskPanel({
           setStreaming(buffer);
         },
         (done) => {
-          setLastAnswer({ answer: buffer, refused: done.refused, sources: done.sources });
+          setLastAnswer({
+            answer: buffer,
+            refused: done.refused,
+            sources: done.sources,
+            citations: done.citations,
+          });
         },
         config,
       );
@@ -181,9 +188,8 @@ export function AskPanel({
             streaming.length === 0 ? (
               <Skeleton lines={4} />
             ) : (
-              <div className="space-y-2" aria-live="polite" aria-busy="true">
+              <div className="streaming-answer" aria-live="polite" aria-busy="true">
                 <Markdown>{streaming}</Markdown>
-                <span className="inline-block h-4 w-2 animate-pulse bg-brand-400 align-middle dark:bg-brand-300" />
               </div>
             )
           ) : loading ? (
@@ -202,7 +208,13 @@ export function AskPanel({
                 <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">
                   {t("common.sources")}
                 </p>
-                {lastAnswer.sources.length > 0 ? (
+                {lastAnswer.citations && lastAnswer.citations.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {lastAnswer.citations.map((c, i) => (
+                      <CitationChip key={`${c.id}-${i}`} label={c.label} id={c.id} config={config} />
+                    ))}
+                  </div>
+                ) : lastAnswer.sources.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {lastAnswer.sources.map((source, i) => (
                       <CitationChip key={`${source}-${i}`} label={source} />

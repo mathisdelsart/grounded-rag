@@ -169,6 +169,12 @@ const en = {
   "common.noSources": "No sources cited.",
   "refusal.title": "Refused — not covered by the course",
 
+  // Source excerpt modal (opened from a citation chip)
+  "source.view": "View the source",
+  "source.title": "Source excerpt",
+  "source.close": "Close",
+  "source.failed": "Could not load the source.",
+
   // Level selector
   "level.aria": "Re-explanation level",
   "level.beginner": "beginner",
@@ -238,13 +244,14 @@ const en = {
     "Solve it, then head to the Grade tab — your answer is linked to this exercise.",
 
   // Grade panel
-  "grade.title": "Grade your answer",
-  "grade.description": "An LLM judge scores your answer and explains why.",
+  "grade.title": "Correct your answer",
+  "grade.description":
+    "Get a detailed correction: a score, what you got right, what to fix, and a complete model answer.",
   "grade.against": "Grading against exercise #{id}",
   "grade.answerLabel": "Your answer",
   "grade.answerPlaceholder": "Write your solution here…",
   "grade.submit": "Grade",
-  "grade.verdictTitle": "Verdict",
+  "grade.verdictTitle": "Correction",
   "grade.empty.title": "Not graded yet",
   "grade.empty.description": "Submit an answer above to get a score and feedback.",
   "grade.score": "Score",
@@ -507,6 +514,12 @@ const fr: Record<TranslationKey, string> = {
   "common.noSources": "Aucune source citée.",
   "refusal.title": "Refusé — non couvert par le cours",
 
+  // Source excerpt modal (opened from a citation chip)
+  "source.view": "Voir la source",
+  "source.title": "Extrait de la source",
+  "source.close": "Fermer",
+  "source.failed": "Impossible de charger la source.",
+
   // Level selector
   "level.aria": "Niveau de réexplication",
   "level.beginner": "débutant",
@@ -581,12 +594,13 @@ const fr: Record<TranslationKey, string> = {
 
   // Grade panel
   "grade.title": "Corriger votre réponse",
-  "grade.description": "Un juge LLM note votre réponse et explique pourquoi.",
+  "grade.description":
+    "Obtenez une correction détaillée : une note, ce qui est juste, ce qu'il faut corriger, et une réponse modèle complète.",
   "grade.against": "Correction selon l'exercice #{id}",
   "grade.answerLabel": "Votre réponse",
   "grade.answerPlaceholder": "Rédigez votre solution ici…",
   "grade.submit": "Corriger",
-  "grade.verdictTitle": "Verdict",
+  "grade.verdictTitle": "Correction",
   "grade.empty.title": "Pas encore corrigé",
   "grade.empty.description":
     "Soumettez une réponse ci-dessus pour obtenir une note et un retour.",
@@ -842,6 +856,12 @@ const nl: Record<TranslationKey, string> = {
   "common.noSources": "Geen bronnen geciteerd.",
   "refusal.title": "Geweigerd — niet behandeld in de cursus",
 
+  // Source excerpt modal (opened from a citation chip)
+  "source.view": "Bekijk de bron",
+  "source.title": "Bronfragment",
+  "source.close": "Sluiten",
+  "source.failed": "Kon de bron niet laden.",
+
   // Level selector
   "level.aria": "Niveau van heruitleg",
   "level.beginner": "beginner",
@@ -910,13 +930,14 @@ const nl: Record<TranslationKey, string> = {
     "Los het op en ga naar het tabblad Beoordelen — je antwoord is gekoppeld aan deze oefening.",
 
   // Grade panel
-  "grade.title": "Beoordeel je antwoord",
-  "grade.description": "Een LLM-jury beoordeelt je antwoord en legt uit waarom.",
+  "grade.title": "Verbeter je antwoord",
+  "grade.description":
+    "Krijg een gedetailleerde correctie: een score, wat goed is, wat te verbeteren, en een volledig modelantwoord.",
   "grade.against": "Beoordeling t.o.v. oefening #{id}",
   "grade.answerLabel": "Jouw antwoord",
   "grade.answerPlaceholder": "Schrijf hier je oplossing…",
   "grade.submit": "Beoordelen",
-  "grade.verdictTitle": "Oordeel",
+  "grade.verdictTitle": "Correctie",
   "grade.empty.title": "Nog niet beoordeeld",
   "grade.empty.description": "Dien hierboven een antwoord in voor een score en feedback.",
   "grade.score": "Score",

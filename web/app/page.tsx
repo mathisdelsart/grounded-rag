@@ -18,7 +18,6 @@ import { LandingCta } from "@/components/LandingCta";
 import { Reveal } from "@/components/Reveal";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { AskPanel } from "@/components/panels/AskPanel";
-import { ReexplainPanel } from "@/components/panels/ReexplainPanel";
 import { ExercisePanel } from "@/components/panels/ExercisePanel";
 import { GradePanel } from "@/components/panels/GradePanel";
 import { QuizPanel } from "@/components/panels/QuizPanel";
@@ -30,7 +29,6 @@ export default function Home() {
   const { t } = useT();
   const TABS: TabItem[] = [
     { id: "ask", label: t("tabs.ask") },
-    { id: "reexplain", label: t("tabs.reexplain") },
     { id: "exercise", label: t("tabs.exercise") },
     { id: "grade", label: t("tabs.grade") },
     { id: "quiz", label: t("tabs.quiz") },
@@ -249,9 +247,6 @@ export default function Home() {
                       setLastAnswer={setLastAnswer}
                       sessionId={activeSessionId}
                     />
-                  )}
-                  {active === "reexplain" && (
-                    <ReexplainPanel studentId={studentId} config={config} lastAnswer={lastAnswer} />
                   )}
                   {active === "exercise" && (
                     <ExercisePanel

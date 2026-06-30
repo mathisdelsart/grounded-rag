@@ -28,10 +28,26 @@ export interface SessionOut {
   created_at: string;
 }
 
+/** A cited source: the chunk id (to fetch its excerpt) and its display label. */
+export interface Citation {
+  id: string;
+  label: string;
+}
+
 export interface AskResponse {
   answer: string;
   refused: boolean;
   sources: string[];
+  citations?: Citation[];
+}
+
+/** A source chunk's full excerpt, resolved from a citation via GET /source/{id}. */
+export interface SourceChunk {
+  id: string;
+  course: string;
+  chapter?: string | null;
+  page: number;
+  text: string;
 }
 
 export interface ReexplainResponse {
@@ -242,6 +258,7 @@ export async function ask(
 /** The final event of a streamed answer: resolved citations and refusal flag. */
 export interface AskStreamDone {
   sources: string[];
+  citations: Citation[];
   refused: boolean;
 }
 
@@ -300,7 +317,13 @@ export async function askStream(
       .map((line) => line.slice(5).trim())
       .join("");
     if (!data) return;
-    let event: { type?: string; text?: string; sources?: string[]; refused?: boolean };
+    let event: {
+      type?: string;
+      text?: string;
+      sources?: string[];
+      citations?: Citation[];
+      refused?: boolean;
+    };
     try {
       event = JSON.parse(data);
     } catch {
@@ -309,7 +332,11 @@ export async function askStream(
     if (event.type === "token" && typeof event.text === "string") {
       onToken(event.text);
     } else if (event.type === "sources") {
-      onDone({ sources: event.sources ?? [], refused: event.refused ?? false });
+      onDone({
+        sources: event.sources ?? [],
+        citations: event.citations ?? [],
+        refused: event.refused ?? false,
+      });
     }
   };
 
@@ -455,6 +482,15 @@ export async function login(
 /** Return the currently authenticated user for the supplied bearer token. */
 export async function me(config?: ConnectionConfig): Promise<AuthUser> {
   return request<AuthUser>("/auth/me", { method: "GET", headers: buildHeaders(config) }, config);
+}
+
+/** Resolve a citation's chunk id into its full source excerpt (GET /source/{id}). */
+export async function getSource(id: string, config?: ConnectionConfig): Promise<SourceChunk> {
+  return request<SourceChunk>(
+    `/source/${encodeURIComponent(id)}`,
+    { method: "GET", headers: buildHeaders(config) },
+    config,
+  );
 }
 
 /** Record a thumbs up/down on a tutor answer. The note is only sent when set. */
