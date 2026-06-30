@@ -318,6 +318,12 @@ const en = {
   "threads.loadFailed": "Could not load threads.",
   "threads.messagesFailed": "Could not load the thread's messages.",
 
+  // Thread selector
+  "threadSelect.label": "Thread",
+  "threadSelect.all": "All history (no thread)",
+  "threadSelect.new": "+ New thread",
+  "threadSelect.created": "New thread created.",
+
   // Review panel (spaced repetition)
   "review.title": "Spaced repetition",
   "review.description":
@@ -715,6 +721,12 @@ const fr: Record<TranslationKey, string> = {
   "threads.loadFailed": "Impossible de charger les fils.",
   "threads.messagesFailed": "Impossible de charger les messages du fil.",
 
+  // Thread selector
+  "threadSelect.label": "Fil",
+  "threadSelect.all": "Tout l'historique (aucun fil)",
+  "threadSelect.new": "+ Nouveau fil",
+  "threadSelect.created": "Nouveau fil créé.",
+
   // Review panel (spaced repetition)
   "review.title": "Répétition espacée",
   "review.description":
@@ -1095,6 +1107,12 @@ const nl: Record<TranslationKey, string> = {
     "Selecteer dit gesprek en stel een vraag op het tabblad Vragen om het te starten.",
   "threads.loadFailed": "Kon gesprekken niet laden.",
   "threads.messagesFailed": "Kon de berichten van het gesprek niet laden.",
+
+  // Thread selector
+  "threadSelect.label": "Gesprek",
+  "threadSelect.all": "Volledige geschiedenis (geen gesprek)",
+  "threadSelect.new": "+ Nieuw gesprek",
+  "threadSelect.created": "Nieuw gesprek aangemaakt.",
 
   // Review panel (spaced repetition)
   "review.title": "Gespreide herhaling",
