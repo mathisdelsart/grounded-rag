@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { AskResponse, ConnectionConfig, ExerciseResponse } from "@/lib/api";
+import type { AskResponse, ConnectionConfig } from "@/lib/api";
 import { KEYS, generateStudentId, readLocal, writeLocal } from "@/lib/storage";
 import { Tabs, type TabItem } from "@/components/Tabs";
 import { HealthBadge } from "@/components/HealthBadge";
@@ -19,7 +19,6 @@ import { Reveal } from "@/components/Reveal";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { AskPanel } from "@/components/panels/AskPanel";
 import { ExercisePanel } from "@/components/panels/ExercisePanel";
-import { GradePanel } from "@/components/panels/GradePanel";
 import { QuizPanel } from "@/components/panels/QuizPanel";
 import { ThreadsPanel } from "@/components/panels/ThreadsPanel";
 import { HistoryPanel } from "@/components/panels/HistoryPanel";
@@ -30,7 +29,6 @@ export default function Home() {
   const TABS: TabItem[] = [
     { id: "ask", label: t("tabs.ask") },
     { id: "exercise", label: t("tabs.exercise") },
-    { id: "grade", label: t("tabs.grade") },
     { id: "quiz", label: t("tabs.quiz") },
     { id: "threads", label: t("tabs.threads") },
     { id: "history", label: t("tabs.history") },
@@ -45,10 +43,9 @@ export default function Home() {
   const [authEmail, setAuthEmail] = useState("");
   const [active, setActive] = useState("ask");
 
-  // Cross-tab state lifted to the page so panels can share the last answer
-  // and the last exercise (Grade links to it).
+  // Cross-tab state lifted to the page so the Ask and Re-explain flows can share
+  // the last answer. The Exercise panel owns its own exercise/grade state.
   const [lastAnswer, setLastAnswer] = useState<AskResponse | null>(null);
-  const [lastExercise, setLastExercise] = useState<ExerciseResponse | null>(null);
   // Active conversation thread shared between the Ask and Threads tabs.
   // null means "All history (unthreaded)" — no session_id is sent.
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -249,15 +246,7 @@ export default function Home() {
                     />
                   )}
                   {active === "exercise" && (
-                    <ExercisePanel
-                      studentId={studentId}
-                      config={config}
-                      lastExercise={lastExercise}
-                      setLastExercise={setLastExercise}
-                    />
-                  )}
-                  {active === "grade" && (
-                    <GradePanel studentId={studentId} config={config} lastExercise={lastExercise} />
+                    <ExercisePanel studentId={studentId} config={config} />
                   )}
                   {active === "quiz" && <QuizPanel studentId={studentId} config={config} />}
                   {active === "threads" && (
