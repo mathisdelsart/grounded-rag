@@ -268,6 +268,32 @@ def test_grade_node_parses_verdict_and_uses_reference(fake_llm):
     assert set(out["grade"]) == {"score", "feedback"}
 
 
+def test_grade_node_parses_detailed_score_markdown_format(fake_llm):
+    # The primary format: a SCORE line then the detailed correction as Markdown
+    # after a divider. The whole correction is kept as feedback (not just one line).
+    fake_llm["reply"] = (
+        "SCORE: 60\n"
+        "---\n"
+        "**What you got right** — the core idea.\n"
+        "**What to fix or add** — missing the finite-energy condition.\n"
+        "**Model answer** — a² + b² = c²."
+    )
+    out = grade({"message": "my answer", "exercise": {"solution": "ref"}})
+    assert out["grade"]["score"] == 60
+    assert out["grade"]["feedback"].startswith("**What you got right**")
+    assert "Model answer" in out["grade"]["feedback"]
+    # The score line and divider must not leak into the rendered correction.
+    assert "SCORE:" not in out["grade"]["feedback"]
+    assert "---" not in out["grade"]["feedback"]
+
+
+def test_grade_node_clamps_score_in_detailed_format(fake_llm):
+    fake_llm["reply"] = "SCORE: 250\n---\nGreat work overall."
+    out = grade({"message": "my answer"})
+    assert out["grade"]["score"] == 100
+    assert out["grade"]["feedback"] == "Great work overall."
+
+
 def test_grade_node_handles_unparseable_verdict(fake_llm):
     fake_llm["reply"] = "totally unstructured"
     out = grade({"message": "my answer"})

@@ -157,3 +157,28 @@ body {
 .prose-tutor .katex-display {
   @apply overflow-x-auto overflow-y-hidden py-1;
 }
+
+/* Streaming caret: a blinking bar that trails the end of the last rendered line
+   as tokens arrive, instead of sitting on its own line below the answer. */
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.streaming-answer .prose-tutor > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 0.45ch;
+  height: 1.05em;
+  margin-left: 2px;
+  border-radius: 1px;
+  vertical-align: -0.15em;
+  background-color: theme(colors.brand.500);
+  animation: caret-blink 1s step-end infinite;
+}

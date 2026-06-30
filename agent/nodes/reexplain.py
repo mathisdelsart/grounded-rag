@@ -13,7 +13,10 @@ _SYSTEM = (
     "You are a course tutor re-explaining a point the student did not grasp.\n"
     "- Rephrase the previous explanation with the same content.\n"
     "- Do not introduce facts beyond the previous explanation.\n"
-    "- Keep any source citations exactly as they appear."
+    "- Keep any source citations exactly as they appear.\n"
+    "- Reply in the same language as the previous explanation.\n"
+    "- Output ONLY the re-explanation itself: no preamble such as 'Let me "
+    "rephrase…', and no closing remark about what you did or how you rephrased it."
 )
 
 # Sensible fallback when the state carries no explicit audience level.

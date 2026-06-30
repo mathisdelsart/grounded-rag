@@ -1,11 +1,12 @@
-"""grade node: LLM-as-a-judge scoring the student's answer.
+"""grade node: LLM-as-a-judge correcting the student's answer.
 
-Scores the answer against the reference solution and returns score, feedback and criteria.
+Compares the student's answer to the reference solution and returns a score plus
+a *detailed* correction (what is right, what to fix, and a complete model answer).
 Distinct from the system-evaluation judge (faithfulness) under eval/.
 
 This is judge #1 (the product feature). It marks the student's answer, ideally
 against the reference solution of a previously generated exercise, and returns a
-numeric score plus feedback.
+numeric score together with an actionable, grounded correction.
 """
 
 import json
@@ -17,30 +18,70 @@ from core.config import get_llm
 from core.obs import get_callbacks
 
 _SYSTEM = (
-    "You are a strict but fair grader for a course tutor.\n"
-    "- Grade the student's answer against the reference, if one is provided.\n"
-    "- Reward correct method and the course's notation; penalize errors.\n"
-    'Reply with JSON only: {"score": <int 0-100>, "feedback": "<short feedback>"}'
+    "You are a supportive but rigorous tutor correcting a student's answer.\n"
+    "- Compare the student's answer to the reference solution when one is given.\n"
+    "- Reward correct method and the course's notation; point out every error and gap.\n"
+    "- Write the whole correction in the SAME LANGUAGE as the student's answer.\n"
+    "\n"
+    "Reply in EXACTLY this format and nothing else:\n"
+    "SCORE: <integer 0-100>\n"
+    "---\n"
+    "<a detailed correction in Markdown, translating these headings into the "
+    "student's language>:\n"
+    "**What you got right** — what the answer covers correctly.\n"
+    "**What to fix or add** — a point-by-point list of errors, imprecisions and "
+    "anything missing.\n"
+    "**Model answer** — a complete, correct answer grounded in the reference and "
+    "the course's notation."
 )
+
+# "SCORE: 60" — requires the colon, so a legacy JSON `"score": 60` (quote before
+# the colon) does not match here and instead falls through to the JSON branch.
+_SCORE_RE = re.compile(r"score\s*:\s*(-?\d+)", re.IGNORECASE)
+
+
+def _clamp(value: object) -> int:
+    """Clamp a model-supplied score to the documented 0-100 range."""
+    try:
+        return max(0, min(100, int(value)))  # type: ignore[arg-type]
+    except (ValueError, TypeError):
+        return 0
 
 
 def _parse(raw: str) -> dict:
-    """Parse the judge's JSON verdict, tolerating extra surrounding text."""
-    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    """Parse the verdict, preferring the ``SCORE:`` + Markdown format.
+
+    A detailed correction is many lines of Markdown, which models routinely break
+    when asked to embed it in a JSON string, so the primary format keeps the score
+    on its own line and the correction as free Markdown after a ``---`` divider.
+    A legacy ``{"score", "feedback"}`` JSON verdict is still accepted as a
+    fallback so older prompts (and the test suite) keep working.
+    """
+    text = raw.strip()
+
+    score_match = _SCORE_RE.search(text)
+    if score_match:
+        if "---" in text:
+            feedback = text.split("---", 1)[1].strip()
+        else:
+            feedback = text[score_match.end() :].strip()
+        if feedback:
+            return {"score": _clamp(score_match.group(1)), "feedback": feedback}
+
+    # Fallback: a legacy JSON verdict, tolerating extra surrounding text.
+    match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         try:
             data = json.loads(match.group(0))
-            # Clamp to the documented 0-100 range so an out-of-range model
-            # score never propagates to the API or the database.
-            score = max(0, min(100, int(data.get("score", 0))))
             return {
-                "score": score,
+                "score": _clamp(data.get("score", 0)),
                 "feedback": str(data.get("feedback", "")).strip(),
             }
         except (ValueError, TypeError):
             pass
-    # If the verdict is unparseable, surface it as feedback rather than guess.
-    return {"score": 0, "feedback": raw.strip()}
+
+    # Unparseable: surface the raw reply as feedback rather than guess a score.
+    return {"score": 0, "feedback": text}
 
 
 def grade(state: TutorState) -> TutorState:

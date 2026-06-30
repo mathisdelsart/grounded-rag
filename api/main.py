@@ -258,12 +258,22 @@ class AskRequest(BaseModel):
     session_id: int | None = None
 
 
+class Citation(BaseModel):
+    """A cited source: the chunk id (to fetch its excerpt) and its label."""
+
+    id: str
+    label: str
+
+
 class AskResponse(BaseModel):
     """A grounded answer, refused when the course does not cover the question."""
 
     answer: str
     refused: bool
     sources: list[str]
+    # Structured citations carry the chunk id so a UI can open the exact source
+    # excerpt via GET /source/{id}; `sources` keeps the plain labels.
+    citations: list[Citation] = []
 
 
 class ReexplainRequest(BaseModel):
@@ -578,6 +588,7 @@ def ask(request: AskRequest, user: UserOut | None = OptionalUser) -> dict[str, A
         "answer": result["answer"],
         "refused": result["refused"],
         "sources": result["sources"],
+        "citations": result.get("citations", []),
     }
 
 
@@ -599,6 +610,7 @@ def _stream_ask_events(request: AskRequest, user: UserOut | None = None) -> Iter
             payload = {
                 "type": "sources",
                 "sources": event.get("sources", []),
+                "citations": event.get("citations", []),
                 "refused": event.get("refused", False),
             }
             yield f"data: {json.dumps(payload)}\n\n"

@@ -19,10 +19,25 @@ REFUSAL = "This is not covered in the course material."
 _SYSTEM = (
     "You are a course tutor that answers strictly from the provided sources.\n"
     "- Use only the numbered sources below; never use outside knowledge.\n"
+    "- Reply in the same language as the question, unless it explicitly asks for "
+    "another language.\n"
     "- After each claim, cite the source index it comes from, like [1] or [2].\n"
-    f"- If the sources do not answer the question, reply exactly: {REFUSAL}\n"
+    "- If the sources do not answer the question, reply with exactly this "
+    f"sentence and nothing else: {REFUSAL}\n"
     "- Keep the course's own notation and definitions."
 )
+
+
+def _citations(raw: str, results: list[Retrieved]) -> list[dict]:
+    """Structured list of the sources the answer cites: chunk id + label.
+
+    The chunk id lets a UI resolve each citation to its exact source excerpt via
+    ``GET /source/{id}``; the label is the human-readable ``(course, p.n)`` text.
+    """
+    return [
+        {"id": results[n - 1].chunk.id, "label": results[n - 1].citation()}
+        for n in _cited_indices(raw, len(results))
+    ]
 
 
 def _remap_citations(text: str, results: list[Retrieved]) -> str:
@@ -91,7 +106,14 @@ def answer(
     with timer("retrieval"):
         results = _retrieve(question, k=k, course=course, chapter=chapter)
     if not results:
-        return {"answer": REFUSAL, "refused": True, "sources": [], "raw": REFUSAL, "retrieved": []}
+        return {
+            "answer": REFUSAL,
+            "refused": True,
+            "sources": [],
+            "citations": [],
+            "raw": REFUSAL,
+            "retrieved": [],
+        }
 
     prompt = f"Sources:\n{format_numbered_sources(results)}\n\nQuestion: {question}"
     with timer("llm"):
@@ -105,14 +127,22 @@ def answer(
         )
 
     if raw.strip() == REFUSAL:
-        return {"answer": REFUSAL, "refused": True, "sources": [], "raw": raw, "retrieved": []}
+        return {
+            "answer": REFUSAL,
+            "refused": True,
+            "sources": [],
+            "citations": [],
+            "raw": raw,
+            "retrieved": [],
+        }
 
     # Only list the sources the answer truly relies on, not every retrieved chunk.
-    sources = [results[n - 1].citation() for n in _cited_indices(raw, len(results))]
+    citations = _citations(raw, results)
     return {
         "answer": _remap_citations(raw, results),
         "refused": False,
-        "sources": sources,
+        "sources": [c["label"] for c in citations],
+        "citations": citations,
         "raw": raw,
         "retrieved": [r.chunk.text for r in results],
     }
@@ -148,7 +178,13 @@ def stream_answer(
         results = _retrieve(question, k=k, course=course, chapter=chapter)
     if not results:
         yield {"type": "token", "text": REFUSAL}
-        yield {"type": "sources", "sources": [], "refused": True, "answer": REFUSAL}
+        yield {
+            "type": "sources",
+            "sources": [],
+            "citations": [],
+            "refused": True,
+            "answer": REFUSAL,
+        }
         return
 
     prompt = f"Sources:\n{format_numbered_sources(results)}\n\nQuestion: {question}"
@@ -166,13 +202,20 @@ def stream_answer(
 
     raw = "".join(parts).strip()
     if raw == REFUSAL:
-        yield {"type": "sources", "sources": [], "refused": True, "answer": REFUSAL}
+        yield {
+            "type": "sources",
+            "sources": [],
+            "citations": [],
+            "refused": True,
+            "answer": REFUSAL,
+        }
         return
 
-    sources = [results[n - 1].citation() for n in _cited_indices(raw, len(results))]
+    citations = _citations(raw, results)
     yield {
         "type": "sources",
-        "sources": sources,
+        "sources": [c["label"] for c in citations],
+        "citations": citations,
         "refused": False,
         "answer": _remap_citations(raw, results),
     }
