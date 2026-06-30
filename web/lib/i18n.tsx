@@ -241,7 +241,7 @@ const en = {
   "exercise.empty.title": "No exercise yet",
   "exercise.empty.description": "Enter a notion above to generate a course-grounded problem.",
   "exercise.solveHint":
-    "Solve it, then head to the Grade tab — your answer is linked to this exercise.",
+    "Solve it, then grade your answer just below — it is linked to this exercise.",
 
   // Grade panel
   "grade.title": "Correct your answer",
@@ -276,11 +276,14 @@ const en = {
 
   // History panel
   "history.title": "Conversation history",
-  "history.description": "Your recent turns with the tutor, oldest first.",
+  "history.description": "Your turns with the tutor, grouped by thread.",
   "history.refresh": "Refresh",
   "history.empty.title": "No history yet",
   "history.empty.description":
     "Ask a question or generate an exercise — your turns will appear here.",
+  "history.unthreaded": "Unthreaded",
+  "history.unthreadedHint": "Turns not attached to any thread.",
+  "history.turnCount": "{count} messages",
 
   // Threads (conversation sessions)
   "threads.title": "Conversation threads",
@@ -590,7 +593,7 @@ const fr: Record<TranslationKey, string> = {
   "exercise.empty.description":
     "Saisissez une notion ci-dessus pour générer un problème ancré dans le cours.",
   "exercise.solveHint":
-    "Résolvez-le, puis allez à l'onglet Corriger — votre réponse est liée à cet exercice.",
+    "Résolvez-le, puis corrigez votre réponse juste en dessous — elle est liée à cet exercice.",
 
   // Grade panel
   "grade.title": "Corriger votre réponse",
@@ -627,11 +630,14 @@ const fr: Record<TranslationKey, string> = {
 
   // History panel
   "history.title": "Historique de conversation",
-  "history.description": "Vos échanges récents avec le tuteur, du plus ancien au plus récent.",
+  "history.description": "Vos échanges avec le tuteur, regroupés par fil.",
   "history.refresh": "Actualiser",
   "history.empty.title": "Pas encore d'historique",
   "history.empty.description":
     "Posez une question ou générez un exercice — vos échanges apparaîtront ici.",
+  "history.unthreaded": "Sans fil",
+  "history.unthreadedHint": "Échanges rattachés à aucun fil.",
+  "history.turnCount": "{count} messages",
 
   // Threads (conversation sessions)
   "threads.title": "Fils de conversation",
@@ -927,7 +933,7 @@ const nl: Record<TranslationKey, string> = {
   "exercise.empty.description":
     "Voer hierboven een begrip in om een op de cursus gebaseerd probleem te genereren.",
   "exercise.solveHint":
-    "Los het op en ga naar het tabblad Beoordelen — je antwoord is gekoppeld aan deze oefening.",
+    "Los het op en beoordeel je antwoord hieronder — het is gekoppeld aan deze oefening.",
 
   // Grade panel
   "grade.title": "Verbeter je antwoord",
@@ -962,11 +968,14 @@ const nl: Record<TranslationKey, string> = {
 
   // History panel
   "history.title": "Gespreksgeschiedenis",
-  "history.description": "Je recente beurten met de tutor, oudste eerst.",
+  "history.description": "Je beurten met de tutor, gegroepeerd per gesprek.",
   "history.refresh": "Vernieuwen",
   "history.empty.title": "Nog geen geschiedenis",
   "history.empty.description":
     "Stel een vraag of genereer een oefening — je beurten verschijnen hier.",
+  "history.unthreaded": "Zonder gesprek",
+  "history.unthreadedHint": "Beurten die aan geen enkel gesprek zijn gekoppeld.",
+  "history.turnCount": "{count} berichten",
 
   // Threads (conversation sessions)
   "threads.title": "Gesprekken",
