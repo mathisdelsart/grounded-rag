@@ -438,11 +438,17 @@ class QuizResponse(BaseModel):
 
 
 class QuizGradeRequest(BaseModel):
-    """A student's answer to one quiz question, graded against its reference."""
+    """A student's answer to one quiz question, graded against its reference.
+
+    ``rigor`` sets the marking strictness applied by the shared grade judge; an
+    unsupported value is rejected with 422 by the ``Rigor`` literal, matching how
+    ``GradeRequest.rigor`` is validated.
+    """
 
     student_id: str
     question_id: int
     answer: str
+    rigor: Rigor = "standard"
 
 
 class QuizGradeAllItem(BaseModel):
@@ -453,10 +459,15 @@ class QuizGradeAllItem(BaseModel):
 
 
 class QuizGradeAllRequest(BaseModel):
-    """All of a student's quiz answers, graded together for a final score."""
+    """All of a student's quiz answers, graded together for a final score.
+
+    ``rigor`` sets the marking strictness applied to every answer; an unsupported
+    value is rejected with 422 by the ``Rigor`` literal, matching ``GradeRequest``.
+    """
 
     student_id: str
     answers: list[QuizGradeAllItem]
+    rigor: Rigor = "standard"
 
 
 class QuizGradeResult(BaseModel):
@@ -1042,7 +1053,9 @@ def quiz_grade(
     """
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
-    verdict = grade_quiz_answer(quiz_id, request.question_id, request.answer, request.student_id)
+    verdict = grade_quiz_answer(
+        quiz_id, request.question_id, request.answer, request.student_id, request.rigor
+    )
     if verdict is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1072,7 +1085,7 @@ def quiz_grade_all(
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
     answers = [{"question_id": a.question_id, "answer": a.answer} for a in request.answers]
-    return summarize_quiz(quiz_id, answers, request.student_id)
+    return summarize_quiz(quiz_id, answers, request.student_id, request.rigor)
 
 
 @app.get(
