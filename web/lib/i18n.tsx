@@ -319,8 +319,9 @@ const en = {
 
   // Threads (conversation sessions)
   "threads.title": "Conversation threads",
-  "threads.description":
-    "Group your questions into threads. The active thread is attached to new questions in the Ask tab.",
+  // Split into two balanced lines, rendered on separate lines in the card header.
+  "threads.description.line1": "Group your questions into conversation threads.",
+  "threads.description.line2": "New questions in the Ask tab join the active thread.",
   "threads.refresh": "Refresh",
   "threads.list.title": "Threads",
   "threads.new": "New thread",
@@ -768,8 +769,8 @@ const fr: Record<TranslationKey, string> = {
 
   // Threads (conversation sessions)
   "threads.title": "Fils de conversation",
-  "threads.description":
-    "Regroupez vos questions en fils. Le fil actif est rattaché aux nouvelles questions de l'onglet Demander.",
+  "threads.description.line1": "Regroupez vos questions dans des fils de conversation.",
+  "threads.description.line2": "Le fil actif reçoit les nouvelles questions de l'onglet Demander.",
   "threads.refresh": "Actualiser",
   "threads.list.title": "Fils",
   "threads.new": "Nouveau fil",
@@ -1201,8 +1202,8 @@ const nl: Record<TranslationKey, string> = {
 
   // Threads (conversation sessions)
   "threads.title": "Gesprekken",
-  "threads.description":
-    "Groepeer je vragen in gesprekken. Het actieve gesprek wordt gekoppeld aan nieuwe vragen op het tabblad Vragen.",
+  "threads.description.line1": "Groepeer je vragen in afzonderlijke gesprekken.",
+  "threads.description.line2": "Het actieve gesprek krijgt de nieuwe vragen van het tabblad Vragen.",
   "threads.refresh": "Vernieuwen",
   "threads.list.title": "Gesprekken",
   "threads.new": "Nieuw gesprek",
