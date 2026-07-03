@@ -152,6 +152,10 @@ const en = {
   "auth.signedOutToast": "Signed out.",
   "auth.failed": "Authentication failed.",
 
+  // Blocking sign-in gate (shown when the backend enforces authentication).
+  "gate.title": "Sign in to continue",
+  "gate.subtitle": "This tutor requires an account. Sign in or create one to get started.",
+
   // Settings panel
   "settings.title": "Settings",
   "settings.studentId": "Student id",
@@ -587,6 +591,11 @@ const fr: Record<TranslationKey, string> = {
   "auth.signedInToast": "Connecté en tant que {email}.",
   "auth.signedOutToast": "Déconnecté.",
   "auth.failed": "Échec de l'authentification.",
+
+  // Blocking sign-in gate (shown when the backend enforces authentication).
+  "gate.title": "Connectez-vous pour continuer",
+  "gate.subtitle":
+    "Ce tuteur nécessite un compte. Connectez-vous ou créez-en un pour commencer.",
 
   // Settings panel
   "settings.title": "Paramètres",
@@ -1024,6 +1033,11 @@ const nl: Record<TranslationKey, string> = {
   "auth.signedInToast": "Ingelogd als {email}.",
   "auth.signedOutToast": "Uitgelogd.",
   "auth.failed": "Authenticatie mislukt.",
+
+  // Blocking sign-in gate (shown when the backend enforces authentication).
+  "gate.title": "Log in om verder te gaan",
+  "gate.subtitle":
+    "Deze tutor vereist een account. Log in of maak er een aan om te beginnen.",
 
   // Settings panel
   "settings.title": "Instellingen",
