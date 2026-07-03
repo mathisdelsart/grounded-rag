@@ -28,6 +28,8 @@ import { cn } from "@/lib/cn";
 interface QuizPanelProps {
   studentId: string;
   config: ConnectionConfig;
+  /** Active thread id, or null; the generated quiz is filed under it. */
+  sessionId: number | null;
 }
 
 /** Clamp a score to 0..100 for the progress meter. */
@@ -44,7 +46,7 @@ function scoreTone(score: number): string {
 
 const COUNTS = [3, 5, 7] as const;
 
-export function QuizPanel({ studentId, config }: QuizPanelProps) {
+export function QuizPanel({ studentId, config, sessionId }: QuizPanelProps) {
   const toast = useToast();
   const { t } = useT();
   const [notion, setNotion] = useState("");
@@ -109,6 +111,7 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
         config,
         course.trim() || null,
         chapter.trim() || null,
+        sessionId,
       );
       setResult(data);
     } catch (err) {

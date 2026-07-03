@@ -306,6 +306,8 @@ const en = {
   "history.refresh": "Refresh",
   "role.you": "You",
   "role.tutor": "Tutor",
+  "history.kind.exercise": "Exercise",
+  "history.kind.quiz": "Quiz",
   "history.empty.title": "No history yet",
   "history.empty.description":
     "Ask a question or generate an exercise — your turns will appear here.",
@@ -759,6 +761,8 @@ const fr: Record<TranslationKey, string> = {
   "history.refresh": "Actualiser",
   "role.you": "Vous",
   "role.tutor": "Tuteur",
+  "history.kind.exercise": "Exercice",
+  "history.kind.quiz": "Quiz",
   "history.empty.title": "Pas encore d'historique",
   "history.empty.description":
     "Posez une question ou générez un exercice — vos échanges apparaîtront ici.",
@@ -1195,6 +1199,8 @@ const nl: Record<TranslationKey, string> = {
   "history.refresh": "Vernieuwen",
   "role.you": "Jij",
   "role.tutor": "Tutor",
+  "history.kind.exercise": "Oefening",
+  "history.kind.quiz": "Quiz",
   "history.empty.title": "Nog geen geschiedenis",
   "history.empty.description":
     "Stel een vraag of genereer een oefening — je beurten verschijnen hier.",

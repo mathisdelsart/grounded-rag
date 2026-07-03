@@ -338,7 +338,11 @@ export default function Home() {
                   hidden={active !== "exercise"}
                   className={active === "exercise" ? "animate-fade-in" : undefined}
                 >
-                  <ExercisePanel studentId={effectiveStudentId} config={config} />
+                  <ExercisePanel
+                    studentId={effectiveStudentId}
+                    config={config}
+                    sessionId={activeSessionId}
+                  />
                 </div>
                 <div
                   id="tabpanel-quiz"
@@ -347,7 +351,11 @@ export default function Home() {
                   hidden={active !== "quiz"}
                   className={active === "quiz" ? "animate-fade-in" : undefined}
                 >
-                  <QuizPanel studentId={effectiveStudentId} config={config} />
+                  <QuizPanel
+                    studentId={effectiveStudentId}
+                    config={config}
+                    sessionId={activeSessionId}
+                  />
                 </div>
                 <div
                   id="tabpanel-threads"
