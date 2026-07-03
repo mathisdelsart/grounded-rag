@@ -297,9 +297,9 @@ def test_exercise_surfaces_refusal(client, monkeypatch):
     assert response.json()["refused"] is True
 
 
-def test_exercise_does_not_write_to_history(client, monkeypatch):
-    # Exercises are persisted by the agent node, not by the API: /exercise must
-    # not create assistant/user Message rows.
+def test_exercise_records_activity_in_history(client, monkeypatch):
+    # A generated exercise is recorded as an activity turn with the distinct
+    # "exercise" role so the history reads as an activity feed, not just Q&A.
     def fake_generate(state):
         return {
             "exercise": {"problem": "Compute X.", "solution": "s", "refused": False},
@@ -309,7 +309,24 @@ def test_exercise_does_not_write_to_history(client, monkeypatch):
     monkeypatch.setattr(api_main, "generate", fake_generate)
 
     client.post("/exercise", json={"student_id": "erin", "notion": "limits"})
-    assert client.get("/history/erin").json() == []
+    rows = client.get("/history/erin").json()
+    assert len(rows) == 1
+    assert rows[0]["role"] == "exercise"
+    assert rows[0]["content"] == "Compute X."
+
+
+def test_exercise_refusal_is_not_recorded(client, monkeypatch):
+    # A refusal (the notion is not covered) produces no activity item.
+    def fake_generate(state):
+        return {
+            "exercise": {"problem": "Not covered.", "solution": "", "refused": True},
+            "retrieved": [],
+        }
+
+    monkeypatch.setattr(api_main, "generate", fake_generate)
+
+    client.post("/exercise", json={"student_id": "erin2", "notion": "off-topic"})
+    assert client.get("/history/erin2").json() == []
 
 
 def test_grade_returns_score_and_feedback(client, monkeypatch):
@@ -581,6 +598,37 @@ def test_reexplain_rebuilds_history_and_returns_rephrased(client, monkeypatch):
     assert "X is a formal structure (Course, p.3)" in contents
 
 
+def test_reexplain_ignores_exercise_activity_in_history(client, monkeypatch):
+    # An exercise activity item recorded between the answer and the re-explain
+    # request must not be mistaken for a tutor turn: reexplain still reformulates
+    # the last real answer, and the exercise content is never fed as tutor context.
+    _seed_conversation(client, monkeypatch, "rexmix")
+    monkeypatch.setattr(
+        api_main,
+        "generate",
+        lambda state: {
+            "exercise": {"problem": "Solve for x.", "solution": "s", "refused": False},
+            "retrieved": [],
+        },
+    )
+    client.post("/exercise", json={"student_id": "rexmix", "notion": "x"})
+
+    captured = {}
+
+    def fake_reexplain(state):
+        captured["state"] = state
+        return {"answer": "Plainer explanation."}
+
+    monkeypatch.setattr(api_main, "reexplain", fake_reexplain)
+    client.post("/reexplain", json={"student_id": "rexmix", "level": "beginner"})
+
+    history = captured["state"]["history"]
+    # The exercise turn keeps its distinct role (never relabelled to "tutor").
+    assert ("exercise", "Solve for x.") in [(t["role"], t["content"]) for t in history]
+    tutor_contents = [t["content"] for t in history if t["role"] == "tutor"]
+    assert tutor_contents == ["X is a formal structure (Course, p.3)"]
+
+
 def test_reexplain_persists_assistant_message(client, monkeypatch):
     _seed_conversation(client, monkeypatch, "rex2")
     monkeypatch.setattr(api_main, "reexplain", lambda state: {"answer": "Plainer explanation."})
@@ -846,11 +894,34 @@ def test_quiz_surfaces_refusal(client, monkeypatch):
         },
     )
 
-    response = client.post("/quiz", json={"student_id": "s1", "notion": "off-topic"})
+    response = client.post("/quiz", json={"student_id": "qref", "notion": "off-topic"})
     assert response.status_code == 200
     body = response.json()
     assert body["refused"] is True
     assert body["questions"] == []
+    # A refused quiz produces no activity item.
+    assert client.get("/history/qref").json() == []
+
+
+def test_quiz_records_activity_summary_in_history(client, monkeypatch):
+    # A generated quiz is recorded as a concise activity turn with the distinct
+    # "quiz" role: the notion and question count, never the full quiz JSON.
+    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None):
+        return {
+            "quiz_id": 1,
+            "notion": notion,
+            "questions": [{"id": 10, "problem": "Q1?"}, {"id": 11, "problem": "Q2?"}],
+            "refused": False,
+        }
+
+    monkeypatch.setattr(api_main, "generate_quiz", fake_generate_quiz)
+
+    client.post("/quiz", json={"student_id": "quizzer", "notion": "groups", "n": 2})
+    rows = client.get("/history/quizzer").json()
+    assert len(rows) == 1
+    assert rows[0]["role"] == "quiz"
+    # Concise summary: the notion and the question count.
+    assert rows[0]["content"] == "groups (2 questions)"
 
 
 def test_quiz_rejects_out_of_range_count(client):
@@ -863,24 +934,53 @@ def test_quiz_rejects_out_of_range_count(client):
 def test_quiz_grade_returns_score_and_feedback(client, monkeypatch):
     captured = {}
 
-    def fake_grade_quiz_answer(quiz_id, question_id, answer, student_id):
-        captured["args"] = (quiz_id, question_id, answer, student_id)
+    def fake_grade_quiz_answer(quiz_id, question_id, answer, student_id, rigor="standard"):
+        captured["args"] = (quiz_id, question_id, answer, student_id, rigor)
         return {"score": 80, "feedback": "Good."}
 
     monkeypatch.setattr(api_main, "grade_quiz_answer", fake_grade_quiz_answer)
 
     response = client.post(
         "/quiz/5/grade",
-        json={"student_id": "s1", "question_id": 10, "answer": "my answer"},
+        json={"student_id": "s1", "question_id": 10, "answer": "my answer", "rigor": "strict"},
     )
     assert response.status_code == 200
     assert response.json() == {"score": 80, "feedback": "Good."}
-    assert captured["args"] == (5, 10, "my answer", "s1")
+    # The requested rigor is threaded into the judge node.
+    assert captured["args"] == (5, 10, "my answer", "s1", "strict")
+
+
+def test_quiz_grade_defaults_rigor_to_standard(client, monkeypatch):
+    captured = {}
+
+    def fake_grade_quiz_answer(quiz_id, question_id, answer, student_id, rigor="standard"):
+        captured["rigor"] = rigor
+        return {"score": 80, "feedback": "Good."}
+
+    monkeypatch.setattr(api_main, "grade_quiz_answer", fake_grade_quiz_answer)
+
+    response = client.post(
+        "/quiz/5/grade", json={"student_id": "s1", "question_id": 10, "answer": "a"}
+    )
+    assert response.status_code == 200
+    # Omitting rigor defaults to the balanced "standard" strictness.
+    assert captured["rigor"] == "standard"
+
+
+def test_quiz_grade_rejects_invalid_rigor(client):
+    response = client.post(
+        "/quiz/5/grade",
+        json={"student_id": "s1", "question_id": 10, "answer": "a", "rigor": "brutal"},
+    )
+    # An unsupported rigor value is rejected by the Rigor literal, like /grade.
+    assert response.status_code == 422
 
 
 def test_quiz_grade_unknown_question_is_404(client, monkeypatch):
     monkeypatch.setattr(
-        api_main, "grade_quiz_answer", lambda quiz_id, question_id, answer, student_id: None
+        api_main,
+        "grade_quiz_answer",
+        lambda quiz_id, question_id, answer, student_id, rigor="standard": None,
     )
 
     response = client.post(
@@ -945,6 +1045,61 @@ def test_quiz_then_grade_end_to_end(client, monkeypatch):
         assert len(grades) == 1
         assert grades[0].exercise_id is None
         assert grades[0].score == 90
+
+
+def test_quiz_grade_all_threads_rigor(client, monkeypatch):
+    captured = {}
+
+    def fake_summarize_quiz(quiz_id, answers, student_id, rigor="standard"):
+        captured["args"] = (quiz_id, answers, student_id, rigor)
+        return {"total": 70, "results": [], "recommendation": "keep going"}
+
+    monkeypatch.setattr(api_main, "summarize_quiz", fake_summarize_quiz)
+
+    response = client.post(
+        "/quiz/9/grade-all",
+        json={
+            "student_id": "s1",
+            "answers": [{"question_id": 1, "answer": "a1"}],
+            "rigor": "lenient",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 70
+    quiz_id, answers, student_id, rigor = captured["args"]
+    assert (quiz_id, student_id, rigor) == (9, "s1", "lenient")
+    assert answers == [{"question_id": 1, "answer": "a1"}]
+
+
+def test_quiz_grade_all_defaults_rigor_to_standard(client, monkeypatch):
+    captured = {}
+
+    def fake_summarize_quiz(quiz_id, answers, student_id, rigor="standard"):
+        captured["rigor"] = rigor
+        return {"total": 0, "results": [], "recommendation": ""}
+
+    monkeypatch.setattr(api_main, "summarize_quiz", fake_summarize_quiz)
+
+    response = client.post(
+        "/quiz/9/grade-all",
+        json={"student_id": "s1", "answers": [{"question_id": 1, "answer": "a"}]},
+    )
+    assert response.status_code == 200
+    # Omitting rigor defaults to the balanced "standard" strictness.
+    assert captured["rigor"] == "standard"
+
+
+def test_quiz_grade_all_rejects_invalid_rigor(client):
+    response = client.post(
+        "/quiz/9/grade-all",
+        json={
+            "student_id": "s1",
+            "answers": [{"question_id": 1, "answer": "a"}],
+            "rigor": "brutal",
+        },
+    )
+    # An unsupported rigor value is rejected by the Rigor literal, like /grade.
+    assert response.status_code == 422
 
 
 # --- API-key authentication --------------------------------------------------
@@ -1013,7 +1168,10 @@ def _stub_nodes(monkeypatch):
     monkeypatch.setattr(
         api_main,
         "grade_quiz_answer",
-        lambda quiz_id, question_id, answer, student_id: {"score": 50, "feedback": "ok"},
+        lambda quiz_id, question_id, answer, student_id, rigor="standard": {
+            "score": 50,
+            "feedback": "ok",
+        },
     )
 
 

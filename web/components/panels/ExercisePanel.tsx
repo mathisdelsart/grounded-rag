@@ -26,6 +26,8 @@ import { cn } from "@/lib/cn";
 interface ExercisePanelProps {
   studentId: string;
   config: ConnectionConfig;
+  /** Active thread id, or null; the generated exercise is filed under it. */
+  sessionId: number | null;
 }
 
 /** Clamp a score to 0..100 for the progress meter. */
@@ -45,7 +47,7 @@ function scoreTone(score: number): string {
  * same flow. Grading depends on a persisted exercise, so it lives here rather
  * than in a separate tab and only appears once a real exercise exists.
  */
-export function ExercisePanel({ studentId, config }: ExercisePanelProps) {
+export function ExercisePanel({ studentId, config, sessionId }: ExercisePanelProps) {
   const toast = useToast();
   const { t } = useT();
   const [notion, setNotion] = useState("");
@@ -84,6 +86,7 @@ export function ExercisePanel({ studentId, config }: ExercisePanelProps) {
         config,
         course.trim() || null,
         chapter.trim() || null,
+        sessionId,
       );
       setLastExercise(generated);
       // A fresh exercise invalidates any answer/verdict from the previous one.

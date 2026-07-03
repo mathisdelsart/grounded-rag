@@ -526,10 +526,12 @@ export async function exercise(
   config?: ConnectionConfig,
   course?: string | null,
   chapter?: string | null,
+  sessionId?: number | null,
 ): Promise<ExerciseResponse> {
   const payload: Record<string, unknown> = { student_id: studentId, notion };
   if (course) payload.course = course;
   if (chapter) payload.chapter = chapter;
+  if (sessionId != null) payload.session_id = sessionId;
   return request<ExerciseResponse>(
     "/exercise",
     {
@@ -571,10 +573,12 @@ export async function quiz(
   config?: ConnectionConfig,
   course?: string | null,
   chapter?: string | null,
+  sessionId?: number | null,
 ): Promise<QuizResponse> {
   const payload: Record<string, unknown> = { student_id: studentId, notion, n };
   if (course) payload.course = course;
   if (chapter) payload.chapter = chapter;
+  if (sessionId != null) payload.session_id = sessionId;
   return request<QuizResponse>(
     "/quiz",
     {
@@ -592,6 +596,7 @@ export async function gradeQuizAnswer(
   quizId: number,
   questionId: number,
   answer: string,
+  rigor: Rigor = "standard",
   config?: ConnectionConfig,
 ): Promise<GradeResponse> {
   return request<GradeResponse>(
@@ -599,7 +604,7 @@ export async function gradeQuizAnswer(
     {
       method: "POST",
       headers: buildHeaders(config, true),
-      body: JSON.stringify({ student_id: studentId, question_id: questionId, answer }),
+      body: JSON.stringify({ student_id: studentId, question_id: questionId, answer, rigor }),
     },
     config,
   );
@@ -610,6 +615,7 @@ export async function gradeQuizAll(
   studentId: string,
   quizId: number,
   answers: QuizGradeAllItem[],
+  rigor: Rigor = "standard",
   config?: ConnectionConfig,
 ): Promise<QuizSummaryResponse> {
   return request<QuizSummaryResponse>(
@@ -617,7 +623,7 @@ export async function gradeQuizAll(
     {
       method: "POST",
       headers: buildHeaders(config, true),
-      body: JSON.stringify({ student_id: studentId, answers }),
+      body: JSON.stringify({ student_id: studentId, answers, rigor }),
     },
     config,
   );
@@ -861,6 +867,13 @@ export interface DocumentProgress {
   indexed?: number;
   elapsed?: number;
   message?: string;
+  /**
+   * Why the ingest finished with the count it did, on a `done` event:
+   * `indexed` (new pages added), `already_indexed` (nothing new, document was
+   * already indexed) or `empty` (nothing extractable). Lets the UI report a
+   * true 0 honestly instead of as a plain success.
+   */
+  reason?: "indexed" | "already_indexed" | "empty";
 }
 
 /** How many indexed points a delete request removed. */

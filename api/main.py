@@ -307,6 +307,38 @@ def _resolve_session_id(session: Any, student_id: int, session_id: int | None) -
     return session_id if thread is not None else None
 
 
+# Distinct message roles for the activity feed. ``user``/``assistant`` are the
+# Q&A turns written by /ask and /reexplain; these two label exercise and quiz
+# activity so the history can style them apart. ``Message.role`` is a plain
+# string column (no enum/CHECK), so new values are safe, and ``to_history`` maps
+# unknown roles through unchanged — they are never treated as tutor context, so
+# reexplain keeps reformulating the last real answer only.
+ROLE_EXERCISE = "exercise"
+ROLE_QUIZ = "quiz"
+
+
+def _record_activity(
+    external_id: str, user: UserOut | None, session_id: int | None, *, role: str, content: str
+) -> None:
+    """Persist one activity item (exercise/quiz) as a message, like /ask does.
+
+    The student is resolved (and ownership enforced) exactly as for a question,
+    and the item is attached to the active thread when ``session_id`` names one
+    of the student's threads. Kept concise on purpose: callers pass a short
+    summary, never a full JSON blob.
+    """
+    with get_session(_engine) as session:
+        student = _resolve_student(session, external_id, user)
+        thread_id = _resolve_session_id(session, student.id, session_id)
+        add_message(
+            session,
+            student_id=student.id,
+            role=role,
+            content=content,
+            session_id=thread_id,
+        )
+
+
 class AskRequest(BaseModel):
     """A question to answer from the course, on behalf of a student.
 
@@ -375,6 +407,9 @@ class ExerciseRequest(BaseModel):
     notion: str
     course: str | None = None
     chapter: str | None = None
+    # Optional thread to attach the resulting activity item to, like /ask. When
+    # None (or not owned by the student) the item stays in the flat history.
+    session_id: int | None = None
 
 
 class ExerciseResponse(BaseModel):
@@ -421,6 +456,9 @@ class QuizRequest(BaseModel):
     n: int = Field(default=3, ge=1, le=10)
     course: str | None = None
     chapter: str | None = None
+    # Optional thread to attach the resulting activity item to, like /ask. When
+    # None (or not owned by the student) the item stays in the flat history.
+    session_id: int | None = None
 
 
 class QuizQuestionOut(BaseModel):
@@ -440,11 +478,17 @@ class QuizResponse(BaseModel):
 
 
 class QuizGradeRequest(BaseModel):
-    """A student's answer to one quiz question, graded against its reference."""
+    """A student's answer to one quiz question, graded against its reference.
+
+    ``rigor`` sets the marking strictness applied by the shared grade judge; an
+    unsupported value is rejected with 422 by the ``Rigor`` literal, matching how
+    ``GradeRequest.rigor`` is validated.
+    """
 
     student_id: str
     question_id: int
     answer: str
+    rigor: Rigor = "standard"
 
 
 class QuizGradeAllItem(BaseModel):
@@ -455,10 +499,15 @@ class QuizGradeAllItem(BaseModel):
 
 
 class QuizGradeAllRequest(BaseModel):
-    """All of a student's quiz answers, graded together for a final score."""
+    """All of a student's quiz answers, graded together for a final score.
+
+    ``rigor`` sets the marking strictness applied to every answer; an unsupported
+    value is rejected with 422 by the ``Rigor`` literal, matching ``GradeRequest``.
+    """
 
     student_id: str
     answers: list[QuizGradeAllItem]
+    rigor: Rigor = "standard"
 
 
 class QuizGradeResult(BaseModel):
@@ -978,6 +1027,16 @@ def exercise(request: ExerciseRequest, user: UserOut | None = DataUser) -> dict[
     # generate always populates "exercise" (a built exercise or a refusal).
     built = state.get("exercise")
     assert built is not None
+    # Record the generated exercise as an activity turn so it shows in history
+    # next to the Q&A. Skip on refusal: an uncovered notion produces no activity.
+    if not built["refused"]:
+        _record_activity(
+            request.student_id,
+            user,
+            request.session_id,
+            role=ROLE_EXERCISE,
+            content=built["problem"],
+        )
     return {"problem": built["problem"], "refused": built["refused"], "id": built.get("id")}
 
 
@@ -1017,13 +1076,26 @@ def quiz(request: QuizRequest, user: UserOut | None = DataUser) -> dict[str, Any
     """
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
-    return generate_quiz(
+    result = generate_quiz(
         request.notion,
         request.n,
         request.student_id,
         course=request.course,
         chapter=request.chapter,
     )
+    # Record a concise activity turn (the notion + question count), never the full
+    # quiz JSON. Skip on refusal: an uncovered notion produces no questions.
+    if not result["refused"] and result["questions"]:
+        count = len(result["questions"])
+        summary = f"{result['notion']} ({count} question{'s' if count != 1 else ''})"
+        _record_activity(
+            request.student_id,
+            user,
+            request.session_id,
+            role=ROLE_QUIZ,
+            content=summary,
+        )
+    return result
 
 
 @app.post(
@@ -1044,7 +1116,9 @@ def quiz_grade(
     """
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
-    verdict = grade_quiz_answer(quiz_id, request.question_id, request.answer, request.student_id)
+    verdict = grade_quiz_answer(
+        quiz_id, request.question_id, request.answer, request.student_id, request.rigor
+    )
     if verdict is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1074,7 +1148,7 @@ def quiz_grade_all(
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
     answers = [{"question_id": a.question_id, "answer": a.answer} for a in request.answers]
-    return summarize_quiz(quiz_id, answers, request.student_id)
+    return summarize_quiz(quiz_id, answers, request.student_id, request.rigor)
 
 
 @app.get(
@@ -1122,9 +1196,12 @@ async def upload_document(
     JSON event from ``core.documents.stream_ingest`` — ``start`` (with the total
     page count and how many were already indexed and thus skipped), one
     ``progress`` per batch (pages done, indexed count, elapsed seconds), then a
-    final ``done`` or ``error``. Pages already indexed for the course are skipped,
-    so re-running an interrupted upload never re-pays the vision model, and each
-    batch is indexed as it is extracted, so a failure keeps the pages done so far.
+    final ``done`` (carrying ``indexed``/``skipped`` and a ``reason`` so a true 0
+    is reported honestly) or ``error``. Each document is scoped by its own
+    identity, so a second file in the same course indexes independently; only
+    re-uploading the same document skips already-indexed pages (never re-paying
+    the vision model), and each batch is indexed as it is extracted, so a failure
+    keeps the pages done so far.
     """
     normalized_chapter = chapter.strip() if chapter and chapter.strip() else None
     contents = await file.read()

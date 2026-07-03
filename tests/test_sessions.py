@@ -183,6 +183,45 @@ def test_ask_with_foreign_session_is_treated_as_unthreaded(client, monkeypatch):
     assert client.get(f"/sessions/s1/{thread['id']}/messages").json() == []
 
 
+def test_exercise_and_quiz_activity_attach_to_session(client, monkeypatch):
+    # Exercise and quiz activity items are filed under the active thread, just
+    # like /ask turns, and carry their distinct roles.
+    monkeypatch.setattr(
+        api_main,
+        "generate",
+        lambda state: {
+            "exercise": {"problem": "Compute X.", "solution": "s", "refused": False},
+            "retrieved": [],
+        },
+    )
+    monkeypatch.setattr(
+        api_main,
+        "generate_quiz",
+        lambda notion, n, student_id, *, course=None, chapter=None: {
+            "quiz_id": 1,
+            "notion": notion,
+            "questions": [{"id": 1, "problem": "Q1?"}],
+            "refused": False,
+        },
+    )
+    thread = client.post("/sessions", json={"student_id": "s1"}).json()
+
+    client.post(
+        "/exercise",
+        json={"student_id": "s1", "notion": "limits", "session_id": thread["id"]},
+    )
+    client.post(
+        "/quiz",
+        json={"student_id": "s1", "notion": "groups", "n": 1, "session_id": thread["id"]},
+    )
+
+    rows = client.get(f"/sessions/s1/{thread['id']}/messages").json()
+    assert [(row["role"], row["content"]) for row in rows] == [
+        ("exercise", "Compute X."),
+        ("quiz", "groups (1 question)"),
+    ]
+
+
 # --- existing flat history unaffected ----------------------------------------
 
 

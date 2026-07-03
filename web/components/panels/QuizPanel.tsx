@@ -9,11 +9,13 @@ import {
   type GradeResponse,
   type QuizResponse,
   type QuizSummaryResponse,
+  type Rigor,
 } from "@/lib/api";
 import { Card, CardBody, CardHeader } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { TextField, TextArea } from "@/components/TextField";
 import { CourseSelect } from "@/components/CourseSelect";
+import { RigorSelector } from "@/components/RigorSelector";
 import { Markdown } from "@/components/Markdown";
 import { EmptyState, RefusalBanner } from "@/components/States";
 import { ThinkingIndicator } from "@/components/ThinkingIndicator";
@@ -26,6 +28,8 @@ import { cn } from "@/lib/cn";
 interface QuizPanelProps {
   studentId: string;
   config: ConnectionConfig;
+  /** Active thread id, or null; the generated quiz is filed under it. */
+  sessionId: number | null;
 }
 
 /** Clamp a score to 0..100 for the progress meter. */
@@ -42,7 +46,7 @@ function scoreTone(score: number): string {
 
 const COUNTS = [3, 5, 7] as const;
 
-export function QuizPanel({ studentId, config }: QuizPanelProps) {
+export function QuizPanel({ studentId, config, sessionId }: QuizPanelProps) {
   const toast = useToast();
   const { t } = useT();
   const [notion, setNotion] = useState("");
@@ -51,6 +55,10 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
   const [course, setCourse] = useState(() => readLocal(KEYS.course));
   const [chapter, setChapter] = useState("");
   const [count, setCount] = useState<number>(3);
+  // Marking strictness applied when correcting answers, shared with the exercise
+  // grade flow. Chosen before grading so it applies to both per-question and
+  // grade-all corrections.
+  const [rigor, setRigor] = useState<Rigor>("standard");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<QuizResponse | null>(null);
 
@@ -70,13 +78,14 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
     writeLocal(KEYS.course, next);
   }
 
-  const hasAnyAnswer = useMemo(
+  const answeredCount = useMemo(
     () =>
-      (result?.questions ?? []).some(
+      (result?.questions ?? []).filter(
         (q) => q.id != null && (answers[q.id] ?? "").trim().length > 0,
-      ),
+      ).length,
     [result, answers],
   );
+  const hasAnyAnswer = answeredCount > 0;
 
   const gradedScores = useMemo(
     () => Object.values(verdicts).map((v) => clampScore(v.score)),
@@ -102,6 +111,7 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
         config,
         course.trim() || null,
         chapter.trim() || null,
+        sessionId,
       );
       setResult(data);
     } catch (err) {
@@ -122,6 +132,7 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
         result.quiz_id,
         questionId,
         answer,
+        rigor,
         config,
       );
       setVerdicts((v) => ({ ...v, [questionId]: verdict }));
@@ -147,7 +158,7 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
     if (payload.length === 0) return;
     setGradingAll(true);
     try {
-      const data = await gradeQuizAll(studentId, quizId, payload, config);
+      const data = await gradeQuizAll(studentId, quizId, payload, rigor, config);
       setSummary(data);
       // Reflect per-question scores in the existing per-question cards.
       setVerdicts((v) => {
@@ -322,7 +333,13 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
             </ol>
           )}
           {result && !result.refused && result.questions.length > 0 && (
-            <div className="mt-6 flex justify-end border-t border-zinc-100 pt-4 dark:border-zinc-800">
+            <div className="mt-6 flex flex-col gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800 sm:flex-row sm:items-end sm:justify-between">
+              <div className="space-y-1.5">
+                <span className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t("rigor.label")}
+                </span>
+                <RigorSelector value={rigor} onChange={setRigor} disabled={gradingAll} />
+              </div>
               <Button
                 loading={gradingAll}
                 disabled={!hasAnyAnswer || gradingAll}
@@ -335,7 +352,19 @@ export function QuizPanel({ studentId, config }: QuizPanelProps) {
         </CardBody>
       </Card>
 
-      {summary && (
+      {gradingAll && (
+        <Card>
+          <CardHeader title={t("quiz.finalScore")} />
+          <CardBody>
+            <ThinkingIndicator
+              variant="grade"
+              label={t("quiz.gradingAll", { count: answeredCount })}
+            />
+          </CardBody>
+        </Card>
+      )}
+
+      {!gradingAll && summary && (
         <Card>
           <CardHeader title={t("quiz.finalScore")} />
           <CardBody className="space-y-4">

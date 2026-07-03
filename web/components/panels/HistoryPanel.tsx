@@ -37,8 +37,21 @@ function formatTime(iso: string, locale: Locale): string {
   });
 }
 
-function isUser(role: string): boolean {
-  return role.toLowerCase() === "user";
+/** The kinds of activity the feed can render, derived from a message role. */
+type TurnKind = "user" | "tutor" | "exercise" | "quiz";
+
+/** Classify a persisted role into an activity kind. Unknown roles read as tutor. */
+function turnKind(role: string): TurnKind {
+  switch (role.toLowerCase()) {
+    case "user":
+      return "user";
+    case "exercise":
+      return "exercise";
+    case "quiz":
+      return "quiz";
+    default:
+      return "tutor";
+  }
 }
 
 export function HistoryPanel({ studentId, config, active, activeSessionId }: HistoryPanelProps) {
@@ -145,32 +158,65 @@ export function HistoryPanel({ studentId, config, active, activeSessionId }: His
           />
         ) : (
           <ol className="space-y-4">
-            {messages.map((turn, i) => (
-              <li
-                key={`${turn.created_at}-${i}`}
-                className={cn(
-                  "flex flex-col gap-1",
-                  isUser(turn.role) ? "items-end" : "items-start",
-                )}
-              >
-                <div className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
-                  <span className="font-medium text-zinc-500 dark:text-zinc-400">
-                    {isUser(turn.role) ? t("role.you") : t("role.tutor")}
-                  </span>
-                  {turn.created_at && <span>· {formatTime(turn.created_at, locale)}</span>}
-                </div>
-                <div
+            {messages.map((turn, i) => {
+              const kind = turnKind(turn.role);
+              const isConversation = kind === "user" || kind === "tutor";
+              // Exercise and quiz are activity items: render them full-width with
+              // a colored badge instead of a left/right conversation bubble, so
+              // the feed reads as an activity log, not just a chat.
+              const badge =
+                kind === "exercise"
+                  ? { label: t("history.kind.exercise"), icon: "✎" }
+                  : kind === "quiz"
+                    ? { label: t("history.kind.quiz"), icon: "✓" }
+                    : null;
+              return (
+                <li
+                  key={`${turn.created_at}-${i}`}
                   className={cn(
-                    "max-w-[85%] rounded-xl border px-4 py-3",
-                    isUser(turn.role)
-                      ? "border-brand-100 bg-brand-50/70 dark:border-brand-500/30 dark:bg-brand-500/10"
-                      : "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800/60",
+                    "flex flex-col gap-1",
+                    kind === "user" ? "items-end" : "items-start",
                   )}
                 >
-                  <Markdown>{turn.content}</Markdown>
-                </div>
-              </li>
-            ))}
+                  <div className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
+                    {badge ? (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
+                          kind === "exercise"
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+                            : "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+                        )}
+                      >
+                        <span aria-hidden>{badge.icon}</span>
+                        {badge.label}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-zinc-500 dark:text-zinc-400">
+                        {kind === "user" ? t("role.you") : t("role.tutor")}
+                      </span>
+                    )}
+                    {turn.created_at && <span>· {formatTime(turn.created_at, locale)}</span>}
+                  </div>
+                  <div
+                    className={cn(
+                      "rounded-xl border px-4 py-3",
+                      isConversation ? "max-w-[85%]" : "w-full",
+                      kind === "user" &&
+                        "border-brand-100 bg-brand-50/70 dark:border-brand-500/30 dark:bg-brand-500/10",
+                      kind === "tutor" &&
+                        "border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800/60",
+                      kind === "exercise" &&
+                        "border-amber-200 bg-amber-50/60 dark:border-amber-500/30 dark:bg-amber-500/5",
+                      kind === "quiz" &&
+                        "border-violet-200 bg-violet-50/60 dark:border-violet-500/30 dark:bg-violet-500/5",
+                    )}
+                  >
+                    <Markdown>{turn.content}</Markdown>
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         )}
       </CardBody>
