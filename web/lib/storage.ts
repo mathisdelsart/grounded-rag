@@ -6,6 +6,7 @@ export const KEYS = {
   apiKey: "grounded-rag:api_key",
   authToken: "grounded-rag:auth_token",
   authEmail: "grounded-rag:auth_email",
+  authName: "grounded-rag:auth_name",
   theme: "grounded-rag:theme",
   locale: "grounded-rag:locale",
   course: "grounded-rag:course",

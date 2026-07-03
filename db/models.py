@@ -44,6 +44,10 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
+    # Optional friendly name shown in the UI instead of the email. Nullable so
+    # existing accounts and registrations without one stay valid (email is used
+    # as the fallback display name).
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     students: Mapped[list[Student]] = relationship(back_populates="user")

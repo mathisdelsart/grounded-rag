@@ -150,6 +150,8 @@ export interface ConnectionConfig {
 export interface AuthUser {
   id: number;
   email: string;
+  /** Friendly name shown instead of the email; falls back to the email when unset. */
+  display_name?: string | null;
 }
 
 /** Token returned by a successful login. */
@@ -627,18 +629,22 @@ export async function gradeQuizAll(
   );
 }
 
-/** Create a new account. Returns the created user (id + email). */
+/** Create a new account. Returns the created user (id + email + display name). */
 export async function register(
   email: string,
   password: string,
   config?: ConnectionConfig,
+  displayName?: string | null,
 ): Promise<AuthUser> {
+  const body: Record<string, unknown> = { email, password };
+  const trimmed = displayName?.trim();
+  if (trimmed) body.display_name = trimmed;
   return request<AuthUser>(
     "/auth/register",
     {
       method: "POST",
       headers: buildHeaders(config, true),
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(body),
     },
     config,
   );
