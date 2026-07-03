@@ -62,10 +62,11 @@ from agent.state import Level, TutorState, to_history
 from api.auth import (
     CurrentUser,
     LoginRequest,
-    OptionalUser,
     RegisterRequest,
     TokenResponse,
     UserOut,
+    get_current_user,
+    get_optional_user,
     login_user,
     register_user,
 )
@@ -225,20 +226,61 @@ def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
         )
 
 
+def get_data_user(authorization: str | None = Header(default=None)) -> UserOut | None:
+    """Resolve the caller for data endpoints, honouring ``REQUIRE_AUTH``.
+
+    When ``require_auth`` is on, a valid bearer token is mandatory (401
+    otherwise); when off, authentication stays optional (anonymous allowed),
+    preserving the MVP behaviour byte-for-byte.
+    """
+    if get_settings().require_auth:
+        return get_current_user(authorization)
+    return get_optional_user(authorization)
+
+
+# Re-exported so routes can declare the flag-aware data dependency concisely.
+DataUser = Depends(get_data_user)
+
+STUDENT_FOREIGN = "This student belongs to another account."
+
+
 def _resolve_student(session: Any, external_id: str, user: UserOut | None) -> Student:
-    """Get-or-create the student and, when authenticated, claim ownership.
+    """Get-or-create the student and, when authenticated, claim/enforce ownership.
 
     Anonymous requests (``user is None``) behave exactly as before: the student
     is keyed solely by ``external_id`` and left unlinked. When a valid bearer
-    token is present, the resolved student is associated with that user if it has
-    no owner yet (``user_id`` stays untouched once set, so a student already
-    owned by someone else is never re-claimed). This is purely additive: it never
-    changes the answer, only the ownership link.
+    token is present, an unowned student is linked to that user. Once a student
+    has an owner it is never re-claimed, so with ``require_auth`` off a student
+    already owned by someone else is left untouched (MVP behaviour). With
+    ``require_auth`` on (``user`` is guaranteed non-None), touching a student that
+    belongs to a *different* account is rejected with 403, giving true tenant
+    isolation. This never changes the answer, only the ownership link.
     """
     student = get_or_create_student(session, external_id)
-    if user is not None and student.user_id is None:
+    if user is None:
+        return student
+    if student.user_id is None:
         student.user_id = user.id
         session.flush()
+    elif student.user_id != user.id and get_settings().require_auth:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=STUDENT_FOREIGN)
+    return student
+
+
+def _student_for_read(session: Any, external_id: str, user: UserOut | None) -> Student | None:
+    """Look up a student by ``external_id`` for a read/scoped route.
+
+    Returns the ``Student`` or ``None``. In ``require_auth`` mode, a student that
+    exists but is not owned by ``user`` is treated as inaccessible: raise 403
+    (never leak another tenant's data). A missing student still returns ``None``
+    so callers keep their existing empty/404 behaviour. With ``require_auth`` off
+    this is a plain lookup, so the anonymous flow is unchanged.
+    """
+    student = session.scalar(select(Student).where(Student.external_id == external_id))
+    if student is None:
+        return None
+    if get_settings().require_auth and user is not None and student.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=STUDENT_FOREIGN)
     return student
 
 
@@ -602,6 +644,19 @@ def ready() -> dict[str, str]:
     return {"status": "ready"}
 
 
+@app.get("/config")
+def public_config() -> dict[str, bool]:
+    """Expose non-sensitive server flags the frontend needs before authenticating.
+
+    Fully open (no API key, no bearer token), like ``/health``: the frontend must
+    be able to learn whether login is mandatory *before* the user has a token, so
+    it can decide to show a blocking login gate. Currently returns only
+    ``{"require_auth": bool}`` — whether every data endpoint requires a valid
+    bearer token and enforces per-user student ownership.
+    """
+    return {"require_auth": get_settings().require_auth}
+
+
 @app.post(
     "/auth/register",
     response_model=UserOut,
@@ -664,7 +719,7 @@ def my_students(current_user: UserOut = CurrentUser) -> list[dict[str, Any]]:
 
 
 @app.post("/ask", response_model=AskResponse, dependencies=[Depends(require_api_key)])
-def ask(request: AskRequest, user: UserOut | None = OptionalUser) -> dict[str, Any]:
+def ask(request: AskRequest, user: UserOut | None = DataUser) -> dict[str, Any]:
     """Answer a question grounded in the course, or refuse if uncovered.
 
     The question and the assistant's answer are persisted as conversation
@@ -759,7 +814,7 @@ REFUSAL_FALLBACK = "This is not covered in the course material."
 
 
 @app.post("/ask/stream", dependencies=[Depends(require_api_key)])
-def ask_stream(request: AskRequest, user: UserOut | None = OptionalUser) -> StreamingResponse:
+def ask_stream(request: AskRequest, user: UserOut | None = DataUser) -> StreamingResponse:
     """Stream a grounded answer token by token as Server-Sent Events.
 
     Mirrors ``/ask`` (same request model, auth and history persistence, and
@@ -767,6 +822,13 @@ def ask_stream(request: AskRequest, user: UserOut | None = OptionalUser) -> Stre
     token deltas arrive first, then a final sources/refusal event. ``/ask`` stays
     available for non-streaming clients.
     """
+    # Resolve (and, in require_auth mode, enforce ownership of) the student up
+    # front so a foreign student is rejected with 403 *before* any bytes stream,
+    # rather than after the answer has already been emitted. The generator
+    # re-resolves at the end to persist the turn; by then the student is owned,
+    # so that call is a no-op link.
+    with get_session(_engine) as session:
+        _resolve_student(session, request.student_id, user)
     return StreamingResponse(
         _stream_ask_events(request, user),
         media_type="text/event-stream",
@@ -786,17 +848,18 @@ def _last_tutor_answer(history: list[dict[str, str]]) -> str | None:
 
 
 @app.post("/reexplain", response_model=ReexplainResponse, dependencies=[Depends(require_api_key)])
-def reexplain_answer(request: ReexplainRequest) -> dict[str, str]:
+def reexplain_answer(request: ReexplainRequest, user: UserOut | None = DataUser) -> dict[str, str]:
     """Rephrase the student's last tutor answer at the requested level.
 
     The recent conversation is rebuilt from the database and handed to the
     ``reexplain`` node, which reformulates the last grounded explanation without
     running retrieval again. The new explanation is persisted as an assistant
     turn so the conversation stays continuous. When the student has no prior
-    answer, a friendly note is returned instead of crashing.
+    answer, a friendly note is returned instead of crashing. In require_auth mode
+    the student must belong to the caller (403 otherwise).
     """
     with get_session(_engine) as session:
-        student = session.scalar(select(Student).where(Student.external_id == request.student_id))
+        student = _student_for_read(session, request.student_id, user)
         if student is None:
             return {"answer": NOTHING_TO_REEXPLAIN}
         history = to_history(recent_messages(session, student.id))
@@ -814,7 +877,7 @@ def reexplain_answer(request: ReexplainRequest) -> dict[str, str]:
 
 
 @app.post("/exercise", response_model=ExerciseResponse, dependencies=[Depends(require_api_key)])
-def exercise(request: ExerciseRequest, user: UserOut | None = OptionalUser) -> dict[str, Any]:
+def exercise(request: ExerciseRequest, user: UserOut | None = DataUser) -> dict[str, Any]:
     """Generate a course-grounded exercise on the requested notion.
 
     The reference solution stays server-side and is never returned. The student
@@ -840,7 +903,7 @@ def exercise(request: ExerciseRequest, user: UserOut | None = OptionalUser) -> d
 
 
 @app.post("/grade", response_model=GradeResponse, dependencies=[Depends(require_api_key)])
-def grade_answer(request: GradeRequest, user: UserOut | None = OptionalUser) -> dict[str, Any]:
+def grade_answer(request: GradeRequest, user: UserOut | None = DataUser) -> dict[str, Any]:
     """Grade the student's answer, optionally against a prior exercise.
 
     The student is ensured to exist (and linked to the caller when
@@ -859,7 +922,7 @@ def grade_answer(request: GradeRequest, user: UserOut | None = OptionalUser) -> 
 
 
 @app.post("/quiz", response_model=QuizResponse, dependencies=[Depends(require_api_key)])
-def quiz(request: QuizRequest, user: UserOut | None = OptionalUser) -> dict[str, Any]:
+def quiz(request: QuizRequest, user: UserOut | None = DataUser) -> dict[str, Any]:
     """Generate a course-grounded quiz of ``n`` questions on the requested notion.
 
     Reference solutions stay server-side and are never returned: each question is
@@ -886,7 +949,7 @@ def quiz(request: QuizRequest, user: UserOut | None = OptionalUser) -> dict[str,
     dependencies=[Depends(require_api_key)],
 )
 def quiz_grade(
-    quiz_id: int, request: QuizGradeRequest, user: UserOut | None = OptionalUser
+    quiz_id: int, request: QuizGradeRequest, user: UserOut | None = DataUser
 ) -> dict[str, Any]:
     """Grade one quiz answer against the question's stored reference solution.
 
@@ -913,7 +976,7 @@ def quiz_grade(
     dependencies=[Depends(require_api_key)],
 )
 def quiz_grade_all(
-    quiz_id: int, request: QuizGradeAllRequest, user: UserOut | None = OptionalUser
+    quiz_id: int, request: QuizGradeAllRequest, user: UserOut | None = DataUser
 ) -> dict[str, Any]:
     """Grade every answered question of a quiz at once and return a final score.
 
@@ -1050,13 +1113,16 @@ def source(chunk_id: str) -> dict[str, Any]:
     response_model=list[HistoryItem],
     dependencies=[Depends(require_api_key)],
 )
-def history(student_id: str, limit: int = 20) -> list[dict[str, str]]:
+def history(
+    student_id: str, limit: int = 20, user: UserOut | None = DataUser
+) -> list[dict[str, str]]:
     """Return the student's most recent turns in chronological order.
 
-    An unknown student yields an empty history rather than an error.
+    An unknown student yields an empty history rather than an error. In
+    require_auth mode the student must belong to the caller (403 otherwise).
     """
     with get_session(_engine) as session:
-        student = session.scalar(select(Student).where(Student.external_id == student_id))
+        student = _student_for_read(session, student_id, user)
         if student is None:
             return []
         rows = recent_messages(session, student.id, limit=limit)
@@ -1074,17 +1140,20 @@ def history(student_id: str, limit: int = 20) -> list[dict[str, str]]:
     "/history/{student_id}",
     dependencies=[Depends(require_api_key)],
 )
-def clear_history(student_id: str, session_id: int | None = None) -> dict[str, int]:
+def clear_history(
+    student_id: str, session_id: int | None = None, user: UserOut | None = DataUser
+) -> dict[str, int]:
     """Delete a student's conversation messages and report how many were removed.
 
     With ``session_id`` set, only that thread's messages are cleared (after
     verifying the thread belongs to the student); without it, every message of
     the student is deleted. An unknown student, or a thread that is not owned by
     the student, yields ``{"deleted": 0}`` rather than an error, mirroring the
-    idempotent style of the other delete routes.
+    idempotent style of the other delete routes. In require_auth mode the student
+    must belong to the caller (403 otherwise).
     """
     with get_session(_engine) as session:
-        student = session.scalar(select(Student).where(Student.external_id == student_id))
+        student = _student_for_read(session, student_id, user)
         if student is None:
             return {"deleted": 0}
         if session_id is not None:
@@ -1106,7 +1175,7 @@ def clear_history(student_id: str, session_id: int | None = None) -> dict[str, i
     dependencies=[Depends(require_api_key)],
 )
 def create_session(
-    request: SessionCreateRequest, user: UserOut | None = OptionalUser
+    request: SessionCreateRequest, user: UserOut | None = DataUser
 ) -> dict[str, Any]:
     """Open a new conversation thread for a student.
 
@@ -1132,13 +1201,14 @@ def create_session(
     response_model=list[SessionOut],
     dependencies=[Depends(require_api_key)],
 )
-def list_sessions(student_id: str) -> list[dict[str, Any]]:
+def list_sessions(student_id: str, user: UserOut | None = DataUser) -> list[dict[str, Any]]:
     """List a student's conversation threads, newest first.
 
-    An unknown student yields an empty list rather than an error.
+    An unknown student yields an empty list rather than an error. In require_auth
+    mode the student must belong to the caller (403 otherwise).
     """
     with get_session(_engine) as session:
-        student = session.scalar(select(Student).where(Student.external_id == student_id))
+        student = _student_for_read(session, student_id, user)
         if student is None:
             return []
         rows = session.scalars(
@@ -1161,14 +1231,17 @@ def list_sessions(student_id: str) -> list[dict[str, Any]]:
     response_model=list[HistoryItem],
     dependencies=[Depends(require_api_key)],
 )
-def session_messages(student_id: str, session_id: int) -> list[dict[str, str]]:
+def session_messages(
+    student_id: str, session_id: int, user: UserOut | None = DataUser
+) -> list[dict[str, str]]:
     """Return the messages of one thread in chronological order.
 
     Yields 404 when the thread does not exist or does not belong to the student,
-    so a caller can never read another student's thread.
+    so a caller can never read another student's thread. In require_auth mode the
+    student must belong to the caller (403 otherwise).
     """
     with get_session(_engine) as session:
-        student = session.scalar(select(Student).where(Student.external_id == student_id))
+        student = _student_for_read(session, student_id, user)
         thread = None
         if student is not None:
             thread = session.scalar(
@@ -1200,15 +1273,18 @@ def session_messages(student_id: str, session_id: int) -> list[dict[str, str]]:
     "/sessions/{student_id}/{session_id}",
     dependencies=[Depends(require_api_key)],
 )
-def delete_session_route(student_id: str, session_id: int) -> dict[str, bool]:
+def delete_session_route(
+    student_id: str, session_id: int, user: UserOut | None = DataUser
+) -> dict[str, bool]:
     """Delete a conversation thread together with its messages.
 
     The thread's messages are removed as well, so deleting a thread clears that
     conversation rather than leaving orphaned turns in the flat history. Yields
-    404 when the thread does not exist or is not owned by the student.
+    404 when the thread does not exist or is not owned by the student. In
+    require_auth mode the student must belong to the caller (403 otherwise).
     """
     with get_session(_engine) as session:
-        student = session.scalar(select(Student).where(Student.external_id == student_id))
+        student = _student_for_read(session, student_id, user)
         thread = None
         if student is not None:
             thread = session.scalar(
@@ -1233,9 +1309,7 @@ def delete_session_route(student_id: str, session_id: int) -> dict[str, bool]:
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_api_key)],
 )
-def submit_feedback(
-    request: FeedbackRequest, user: UserOut | None = OptionalUser
-) -> dict[str, int]:
+def submit_feedback(request: FeedbackRequest, user: UserOut | None = DataUser) -> dict[str, int]:
     """Persist a student's thumbs up/down on a tutor answer.
 
     The student is ensured to exist (and linked to the caller when
@@ -1264,14 +1338,15 @@ def submit_feedback(
     response_model=FeedbackSummary,
     dependencies=[Depends(require_api_key)],
 )
-def feedback_summary(student_id: str) -> dict[str, int]:
+def feedback_summary(student_id: str, user: UserOut | None = DataUser) -> dict[str, int]:
     """Return thumbs up/down counts for a student.
 
     An unknown student yields zero counts rather than an error. Useful for a
-    lightweight quality signal without exposing individual feedback rows.
+    lightweight quality signal without exposing individual feedback rows. In
+    require_auth mode the student must belong to the caller (403 otherwise).
     """
     with get_session(_engine) as session:
-        student = session.scalar(select(Student).where(Student.external_id == student_id))
+        student = _student_for_read(session, student_id, user)
         if student is None:
             return {"up": 0, "down": 0}
         up = session.scalar(
@@ -1292,7 +1367,7 @@ def feedback_summary(student_id: str) -> dict[str, int]:
     response_model=ReviewSchedule,
     dependencies=[Depends(require_api_key)],
 )
-def record_review(request: ReviewRequest, user: UserOut | None = OptionalUser) -> dict[str, Any]:
+def record_review(request: ReviewRequest, user: UserOut | None = DataUser) -> dict[str, Any]:
     """Record a recall rating for a notion and return its updated schedule.
 
     The student is ensured to exist (and linked to the caller when
@@ -1349,7 +1424,7 @@ def record_review(request: ReviewRequest, user: UserOut | None = OptionalUser) -
     dependencies=[Depends(require_api_key)],
 )
 def enqueue_review(
-    request: EnqueueReviewRequest, user: UserOut | None = OptionalUser
+    request: EnqueueReviewRequest, user: UserOut | None = DataUser
 ) -> dict[str, Any]:
     """Add a notion to the spaced-repetition queue, due immediately.
 
@@ -1390,17 +1465,18 @@ def enqueue_review(
     response_model=list[ReviewSchedule],
     dependencies=[Depends(require_api_key)],
 )
-def due_reviews(student_id: str) -> list[dict[str, Any]]:
+def due_reviews(student_id: str, user: UserOut | None = DataUser) -> list[dict[str, Any]]:
     """List the student's notions due for review, soonest first.
 
     A notion is due when its ``due_at`` is at or before "now". Newly created
     rows default ``due_at`` to their creation time, so brand-new notions are due
     immediately and surface here too. An unknown student yields an empty list
-    rather than an error. This route reaches no LLM and runs no retrieval.
+    rather than an error. This route reaches no LLM and runs no retrieval. In
+    require_auth mode the student must belong to the caller (403 otherwise).
     """
     now = datetime.now(UTC)
     with get_session(_engine) as session:
-        student = session.scalar(select(Student).where(Student.external_id == student_id))
+        student = _student_for_read(session, student_id, user)
         if student is None:
             return []
         rows = session.scalars(

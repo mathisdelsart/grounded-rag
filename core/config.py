@@ -151,6 +151,14 @@ class Settings(BaseSettings):
     # "INFO" keeps the test suite quiet (DEBUG would be noisy).
     log_level: str = "INFO"
 
+    # Enforced multi-user mode (opt-in). When OFF (the default) the API stays
+    # anonymous: callers are keyed by a device `student_id` and authentication is
+    # optional, exactly as in the MVP. When ON, every data endpoint requires a
+    # valid bearer token (401 otherwise) and enforces per-user student ownership,
+    # so a caller can only touch students that belong to their own account (true
+    # tenant isolation). This is independent of `api_key`; the two guards coexist.
+    require_auth: bool = False
+
     # Secret used to sign user JWTs (HS256). The default is an insecure
     # placeholder for local development only and MUST be overridden in
     # production via `JWT_SECRET` (or `.env`); leaking it lets anyone forge a

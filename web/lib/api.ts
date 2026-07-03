@@ -244,6 +244,31 @@ export async function checkHealth(config?: ConnectionConfig): Promise<boolean> {
   }
 }
 
+/** Non-sensitive server flags the frontend needs before authenticating. */
+export interface AppConfig {
+  /** When true, every data endpoint requires a valid bearer token. */
+  require_auth: boolean;
+}
+
+/**
+ * Fetch public server configuration (GET /config). Fully open (no auth), so the
+ * frontend can learn whether login is mandatory before the user has a token and
+ * decide to show a blocking login gate. Falls back to `{ require_auth: false }`
+ * on any error so an unreachable backend never locks the anonymous MVP flow.
+ */
+export async function getConfig(config?: ConnectionConfig): Promise<AppConfig> {
+  try {
+    const data = await request<{ require_auth?: boolean }>(
+      "/config",
+      { method: "GET", headers: buildHeaders(config) },
+      config,
+    );
+    return { require_auth: Boolean(data.require_auth) };
+  } catch {
+    return { require_auth: false };
+  }
+}
+
 /** List the distinct courses currently indexed, sorted. Empty when none. */
 export async function getCourses(config?: ConnectionConfig): Promise<string[]> {
   const data = await request<{ courses?: string[] }>(

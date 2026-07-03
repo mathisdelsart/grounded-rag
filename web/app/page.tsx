@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { AskResponse, ConnectionConfig } from "@/lib/api";
+import { getConfig, me, type AskResponse, type ConnectionConfig } from "@/lib/api";
 import { KEYS, generateStudentId, readLocal, writeLocal } from "@/lib/storage";
 import { Tabs, type TabItem } from "@/components/Tabs";
 import { HealthBadge } from "@/components/HealthBadge";
 import { AuthMenu } from "@/components/AuthMenu";
+import { AuthGate } from "@/components/AuthGate";
 import { BrandMark } from "@/components/Logo";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useT } from "@/lib/i18n";
@@ -43,6 +44,13 @@ export default function Home() {
   const [token, setToken] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [active, setActive] = useState("ask");
+  // Enforced multi-user mode, learned from GET /config. When true and the user
+  // is not signed in, a blocking login gate replaces the app. Defaults to false
+  // so an unreachable backend never locks the anonymous MVP flow.
+  const [requireAuth, setRequireAuth] = useState(false);
+  // The signed-in user's id, used to derive an account-scoped student id in
+  // enforced mode so two accounts on one browser never share data.
+  const [authUserId, setAuthUserId] = useState<number | null>(null);
 
   // Cross-tab state lifted to the page so the Ask and Re-explain flows can share
   // the last answer. The Exercise panel owns its own exercise/grade state.
@@ -85,6 +93,48 @@ export default function Home() {
     [baseUrl, apiKey, token],
   );
 
+  // Learn whether the backend enforces authentication (once ready, and whenever
+  // the connection target changes). getConfig swallows errors and returns
+  // require_auth:false, so a down backend keeps the anonymous flow usable.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    getConfig({ baseUrl: baseUrl || undefined, apiKey: apiKey || undefined })
+      .then((cfg) => {
+        if (!cancelled) setRequireAuth(cfg.require_auth);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, baseUrl, apiKey]);
+
+  // In enforced mode, resolve the signed-in user's id so the student id can be
+  // scoped to the account. Cleared when signed out or when enforcement is off.
+  useEffect(() => {
+    if (!requireAuth || !token) {
+      setAuthUserId(null);
+      return;
+    }
+    let cancelled = false;
+    me({ ...config, token })
+      .then((user) => {
+        if (!cancelled) setAuthUserId(user.id);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // `config` is derived from token/baseUrl/apiKey; re-run when those change.
+  }, [requireAuth, token, config]);
+
+  // The student id the tool actually uses. In enforced mode it is scoped to the
+  // account ("u<id>") so the same account is consistent across devices and two
+  // accounts on one browser never collide; otherwise the device id is kept
+  // exactly as before.
+  const effectiveStudentId =
+    requireAuth && authUserId != null ? `u${authUserId}` : studentId;
+
   function onLogin(nextToken: string, nextEmail: string) {
     setToken(nextToken);
     setAuthEmail(nextEmail);
@@ -110,6 +160,12 @@ export default function Home() {
 
   if (!ready) {
     return <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950" />;
+  }
+
+  // Enforced multi-user mode: block the whole app behind a sign-in gate until
+  // the visitor has a token. Signing in sets `token`, which removes the gate.
+  if (requireAuth && !token) {
+    return <AuthGate config={config} onLogin={onLogin} />;
   }
 
   return (
@@ -220,7 +276,7 @@ export default function Home() {
 
               <div className="space-y-6 p-6 sm:p-8">
                 <SettingsPanel
-                  studentId={studentId}
+                  studentId={effectiveStudentId}
                   baseUrl={baseUrl}
                   apiKey={apiKey}
                   onSave={saveSettings}
@@ -230,7 +286,7 @@ export default function Home() {
                     the active conversation thread can be seen and changed from
                     anywhere, sharing the page's activeSessionId/selectSession. */}
                 <ThreadSelect
-                  studentId={studentId}
+                  studentId={effectiveStudentId}
                   config={config}
                   value={activeSessionId}
                   onChange={selectSession}
@@ -250,7 +306,7 @@ export default function Home() {
                 >
                   {active === "ask" && (
                     <AskPanel
-                      studentId={studentId}
+                      studentId={effectiveStudentId}
                       config={config}
                       lastAnswer={lastAnswer}
                       setLastAnswer={setLastAnswer}
@@ -258,12 +314,12 @@ export default function Home() {
                     />
                   )}
                   {active === "exercise" && (
-                    <ExercisePanel studentId={studentId} config={config} />
+                    <ExercisePanel studentId={effectiveStudentId} config={config} />
                   )}
-                  {active === "quiz" && <QuizPanel studentId={studentId} config={config} />}
+                  {active === "quiz" && <QuizPanel studentId={effectiveStudentId} config={config} />}
                   {active === "threads" && (
                     <ThreadsPanel
-                      studentId={studentId}
+                      studentId={effectiveStudentId}
                       config={config}
                       active={active === "threads"}
                       activeSessionId={activeSessionId}
@@ -272,14 +328,14 @@ export default function Home() {
                   )}
                   {active === "history" && (
                     <HistoryPanel
-                      studentId={studentId}
+                      studentId={effectiveStudentId}
                       config={config}
                       active={active === "history"}
                       activeSessionId={activeSessionId}
                     />
                   )}
                   {active === "documents" && (
-                    <DocumentsPanel studentId={studentId} config={config} />
+                    <DocumentsPanel studentId={effectiveStudentId} config={config} />
                   )}
                 </div>
               </div>
