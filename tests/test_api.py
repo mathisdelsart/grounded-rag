@@ -601,6 +601,48 @@ def test_reexplain_rejects_invalid_level(client):
     assert response.status_code == 422
 
 
+# --- /reexplain/stream (SSE) -------------------------------------------------
+
+
+def test_reexplain_stream_streams_tokens_then_done_and_persists(client, monkeypatch):
+    _seed_conversation(client, monkeypatch, "rexs")
+
+    def fake_stream_reexplain(state):
+        yield {"type": "token", "text": "Plainer "}
+        yield {"type": "token", "text": "words."}
+        yield {"type": "done", "answer": "Plainer words."}
+
+    monkeypatch.setattr(api_main, "stream_reexplain", fake_stream_reexplain)
+
+    response = client.post("/reexplain/stream", json={"student_id": "rexs", "level": "beginner"})
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+
+    events = _parse_sse(response.text)
+    assert events[0] == {"type": "token", "text": "Plainer "}
+    assert events[-1] == {"type": "done", "answer": "Plainer words."}
+
+    # The assembled re-explanation is persisted as the last assistant turn.
+    history = client.get("/history/rexs").json()
+    assert (history[-1]["role"], history[-1]["content"]) == ("assistant", "Plainer words.")
+
+
+def test_reexplain_stream_without_prior_answer_is_graceful(client, monkeypatch):
+    called = {"node": False}
+
+    def fake_stream_reexplain(state):
+        called["node"] = True
+        yield {"type": "done", "answer": "should not happen"}
+
+    monkeypatch.setattr(api_main, "stream_reexplain", fake_stream_reexplain)
+
+    response = client.post("/reexplain/stream", json={"student_id": "nobody", "level": "beginner"})
+    assert response.status_code == 200
+    events = _parse_sse(response.text)
+    assert "no previous answer" in events[-1]["answer"].lower()
+    assert called["node"] is False
+
+
 # --- End-to-end persistence (real generate/grade nodes, no LLM/network) ------
 
 

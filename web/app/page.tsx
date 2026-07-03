@@ -16,7 +16,7 @@ import { Features } from "@/components/Features";
 import { StatsBand } from "@/components/StatsBand";
 import { LandingCta } from "@/components/LandingCta";
 import { Reveal } from "@/components/Reveal";
-import { SettingsPanel } from "@/components/SettingsPanel";
+import { SettingsPanel, DEFAULT_SOURCES_MAX } from "@/components/SettingsPanel";
 import { ThreadSelect } from "@/components/ThreadSelect";
 import { AskPanel } from "@/components/panels/AskPanel";
 import { ExercisePanel } from "@/components/panels/ExercisePanel";
@@ -40,6 +40,8 @@ export default function Home() {
   const [studentId, setStudentId] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  // Max candidate-source pool (`k`) for Ask; configurable in Settings.
+  const [sourcesMax, setSourcesMax] = useState(DEFAULT_SOURCES_MAX);
   const [token, setToken] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [active, setActive] = useState("ask");
@@ -64,6 +66,8 @@ export default function Home() {
     setApiKey(readLocal(KEYS.apiKey));
     setToken(readLocal(KEYS.authToken));
     setAuthEmail(readLocal(KEYS.authEmail));
+    const storedSources = Number.parseInt(readLocal(KEYS.sourcesMax), 10);
+    if (Number.isFinite(storedSources)) setSourcesMax(storedSources);
     const storedSession = readLocal(KEYS.sessionId);
     const parsedSession = storedSession ? Number(storedSession) : NaN;
     setActiveSessionId(Number.isInteger(parsedSession) ? parsedSession : null);
@@ -99,13 +103,20 @@ export default function Home() {
     writeLocal(KEYS.authEmail, "");
   }
 
-  function saveSettings(next: { studentId: string; baseUrl: string; apiKey: string }) {
+  function saveSettings(next: {
+    studentId: string;
+    baseUrl: string;
+    apiKey: string;
+    sourcesMax: number;
+  }) {
     setStudentId(next.studentId);
     setBaseUrl(next.baseUrl);
     setApiKey(next.apiKey);
+    setSourcesMax(next.sourcesMax);
     writeLocal(KEYS.studentId, next.studentId);
     writeLocal(KEYS.baseUrl, next.baseUrl);
     writeLocal(KEYS.apiKey, next.apiKey);
+    writeLocal(KEYS.sourcesMax, String(next.sourcesMax));
   }
 
   if (!ready) {
@@ -223,6 +234,7 @@ export default function Home() {
                   studentId={studentId}
                   baseUrl={baseUrl}
                   apiKey={apiKey}
+                  sourcesMax={sourcesMax}
                   onSave={saveSettings}
                 />
 
@@ -255,6 +267,7 @@ export default function Home() {
                       lastAnswer={lastAnswer}
                       setLastAnswer={setLastAnswer}
                       sessionId={activeSessionId}
+                      sourcesMax={sourcesMax}
                     />
                   )}
                   {active === "exercise" && (
