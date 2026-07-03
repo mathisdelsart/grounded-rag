@@ -139,3 +139,20 @@ def test_reviews_table_upgrade_and_downgrade(database_url: str) -> None:
         assert "reviews" not in set(inspect(engine).get_table_names())
     finally:
         engine.dispose()
+
+
+def test_user_display_name_upgrade_and_downgrade(database_url: str) -> None:
+    """The 0008 migration adds ``users.display_name``, and ``downgrade`` drops it."""
+    cfg = _make_config(database_url)
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(database_url, future=True)
+    try:
+        user_cols = {c["name"] for c in inspect(engine).get_columns("users")}
+        assert "display_name" in user_cols
+
+        command.downgrade(cfg, "0007")
+        user_cols = {c["name"] for c in inspect(engine).get_columns("users")}
+        assert "display_name" not in user_cols
+    finally:
+        engine.dispose()

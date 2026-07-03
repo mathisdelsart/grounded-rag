@@ -1,90 +1,64 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { login, me, register, type AuthUser, type ConnectionConfig } from "@/lib/api";
+import { type ConnectionConfig } from "@/lib/api";
+import { AuthCard } from "@/components/AuthCard";
 import { Button } from "@/components/Button";
-import { TextField } from "@/components/TextField";
 import { useToast } from "@/components/Toast";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 
 interface AuthMenuProps {
   config: ConnectionConfig;
+  /** Friendly display name, when the account set one. */
+  name: string | null;
+  /** Canonical email; shown when no display name is set. */
   email: string | null;
-  onLogin: (token: string, email: string) => void;
+  onLogin: (token: string, email: string, displayName?: string | null) => void;
   onLogout: () => void;
 }
 
-type Mode = "login" | "register";
-
 /**
- * Header account menu. When signed out, it opens a small login/register form;
- * when signed in, it shows the user's email and a logout action. The JWT is
- * lifted to the parent (persisted to localStorage) and sent on requests as a
- * bearer token, additively to the optional API key.
+ * Header account menu. When signed out, the trigger opens the shared
+ * {@link AuthCard} as a centered modal overlay (not a cramped dropdown); when
+ * signed in, it shows the account's display name (falling back to the email) and
+ * a logout action. The JWT is lifted to the parent (persisted to localStorage)
+ * and sent on requests as a bearer token, additively to the optional API key.
  */
-export function AuthMenu({ config, email, onLogin, onLogout }: AuthMenuProps) {
+export function AuthMenu({ config, name, email, onLogin, onLogout }: AuthMenuProps) {
   const toast = useToast();
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const [mode, setMode] = useState<Mode>("login");
+
+  const isAuthed = Boolean(email);
+  const label = name || email;
+
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
 
   // While open, close on Escape or an outside click, returning focus to the
-  // trigger so keyboard users are never stranded inside a dismissed dialog.
+  // trigger so keyboard users are never stranded inside a dismissed dialog. The
+  // outside-click guard only applies to the signed-in dropdown; the signed-out
+  // modal handles its own backdrop click below.
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
+      if (e.key === "Escape") close();
     }
     function onClick(e: MouseEvent) {
       if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onClick);
+    if (isAuthed) document.addEventListener("mousedown", onClick);
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onClick);
     };
-  }, [open]);
-  const [emailInput, setEmailInput] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const isAuthed = Boolean(email);
-  const canSubmit = emailInput.trim().length > 0 && password.length > 0 && !loading;
-
-  function reset() {
-    setEmailInput("");
-    setPassword("");
-  }
-
-  async function submit() {
-    if (!canSubmit) return;
-    setLoading(true);
-    try {
-      const trimmedEmail = emailInput.trim();
-      if (mode === "register") {
-        await register(trimmedEmail, password, config);
-        toast.push(t("auth.accountCreated"), "success");
-      }
-      const { access_token } = await login(trimmedEmail, password, config);
-      // Confirm the token resolves and read back the canonical email.
-      const user: AuthUser = await me({ ...config, token: access_token });
-      onLogin(access_token, user.email);
-      toast.push(t("auth.signedInToast", { email: user.email }), "success");
-      reset();
-      setOpen(false);
-    } catch (err) {
-      toast.push(err instanceof Error ? err.message : t("auth.failed"), "error");
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [open, isAuthed]);
 
   function logout() {
     onLogout();
@@ -110,73 +84,43 @@ export function AuthMenu({ config, email, onLogin, onLogout }: AuthMenuProps) {
         {isAuthed ? (
           <>
             <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-            <span className="max-w-[12rem] truncate">{email}</span>
+            <span className="max-w-[12rem] truncate">{label}</span>
           </>
         ) : (
           <span>{t("header.signIn")}</span>
         )}
       </button>
 
-      {open && (
+      {/* Signed-in: a compact dropdown with the identity and a logout action. */}
+      {open && isAuthed && (
         <div
           role="dialog"
           aria-label={t("auth.aria")}
           className="animate-fade-in absolute right-0 z-30 mt-2 w-72 rounded-xl border border-zinc-200 bg-white p-4 shadow-card-hover dark:border-zinc-700 dark:bg-zinc-900"
         >
-          {isAuthed ? (
-            <div className="space-y-3">
-              <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                {t("auth.signedInAs")}{" "}
-                <span className="font-medium text-zinc-900 dark:text-zinc-100">{email}</span>
-              </p>
-              <Button variant="secondary" className="w-full" onClick={logout}>
-                {t("auth.signOut")}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex rounded-lg border border-zinc-200 p-0.5 text-sm dark:border-zinc-700">
-                {(["login", "register"] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={cn(
-                      "flex-1 rounded-md px-2 py-1 font-medium transition-colors",
-                      "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-                      mode === m
-                        ? "bg-brand-600 text-white dark:bg-brand-500"
-                        : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800",
-                    )}
-                  >
-                    {m === "login" ? t("auth.signIn") : t("auth.register")}
-                  </button>
-                ))}
-              </div>
-              <TextField
-                label={t("auth.email")}
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-              />
-              <TextField
-                label={t("auth.password")}
-                type="password"
-                autoComplete={mode === "register" ? "new-password" : "current-password"}
-                placeholder="••••••••"
-                hint={mode === "register" ? t("auth.passwordHint") : undefined}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") submit();
-                }}
-              />
-              <Button className="w-full" onClick={submit} loading={loading} disabled={!canSubmit}>
-                {mode === "login" ? t("auth.signIn") : t("auth.createAccount")}
-              </Button>
-            </div>
-          )}
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+              {t("auth.signedInAs")}{" "}
+              <span className="font-medium text-zinc-900 dark:text-zinc-100">{label}</span>
+            </p>
+            <Button variant="secondary" className="w-full" onClick={logout}>
+              {t("auth.signOut")}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Signed-out: a centered modal overlay hosting the shared AuthCard. */}
+      {open && !isAuthed && (
+        <div
+          className="animate-fade-in fixed inset-0 z-40 flex items-center justify-center bg-ink/40 px-4 backdrop-blur-sm"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) close();
+          }}
+        >
+          <div role="dialog" aria-modal="true" aria-label={t("auth.aria")}>
+            <AuthCard config={config} onLogin={onLogin} onSuccess={() => setOpen(false)} />
+          </div>
         </div>
       )}
     </div>

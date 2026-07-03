@@ -115,7 +115,7 @@ def test_anonymous_ask_creates_unlinked_student(client):
     assert student.user_id is None
 
 
-def test_existing_student_is_not_reclaimed_by_another_user(client):
+def test_existing_student_of_another_user_is_forbidden(client):
     # First user claims the student.
     token_a = _token(client, "first@example.com")
     me_a = client.get("/auth/me", headers={"Authorization": f"Bearer {token_a}"}).json()
@@ -126,14 +126,37 @@ def test_existing_student_is_not_reclaimed_by_another_user(client):
     )
     assert _student("shared").user_id == me_a["id"]
 
-    # A second user touching the same student id does not steal ownership.
+    # A second logged-in user touching the same student id is rejected with 403,
+    # even with REQUIRE_AUTH off: being logged in always isolates. Ownership never
+    # changes hands.
     token_b = _token(client, "second@example.com")
-    client.post(
+    response = client.post(
         "/ask",
         json={"student_id": "shared", "question": "q"},
         headers={"Authorization": f"Bearer {token_b}"},
     )
+    assert response.status_code == 403
     assert _student("shared").user_id == me_a["id"]
+
+
+def test_logged_in_user_cannot_read_another_users_student(client):
+    # Isolation on reads holds with REQUIRE_AUTH off too: user A owns the student,
+    # user B is forbidden from reading its history.
+    token_a = _token(client, "reada@example.com")
+    token_b = _token(client, "readb@example.com")
+    client.post(
+        "/ask",
+        json={"student_id": "a-owned", "question": "q"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert (
+        client.get("/history/a-owned", headers={"Authorization": f"Bearer {token_a}"}).status_code
+        == 200
+    )
+    assert (
+        client.get("/history/a-owned", headers={"Authorization": f"Bearer {token_b}"}).status_code
+        == 403
+    )
 
 
 # --- GET /me/students --------------------------------------------------------

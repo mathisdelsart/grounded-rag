@@ -151,6 +151,10 @@ const en = {
   "auth.signedInToast": "Signed in as {email}.",
   "auth.signedOutToast": "Signed out.",
   "auth.failed": "Authentication failed.",
+  "auth.displayName": "Display name (optional)",
+  "auth.displayNamePlaceholder": "How should we call you?",
+  "auth.cardTitle": "Sign in to your tutor",
+  "auth.cardSubtitle": "Ask questions and get answers grounded in your own courses.",
 
   // Blocking sign-in gate (shown when the backend enforces authentication).
   "gate.title": "Sign in to continue",
@@ -591,6 +595,11 @@ const fr: Record<TranslationKey, string> = {
   "auth.signedInToast": "Connecté en tant que {email}.",
   "auth.signedOutToast": "Déconnecté.",
   "auth.failed": "Échec de l'authentification.",
+  "auth.displayName": "Nom affiché (facultatif)",
+  "auth.displayNamePlaceholder": "Comment vous appeler ?",
+  "auth.cardTitle": "Connectez-vous à votre tuteur",
+  "auth.cardSubtitle":
+    "Posez vos questions et obtenez des réponses ancrées dans vos propres cours.",
 
   // Blocking sign-in gate (shown when the backend enforces authentication).
   "gate.title": "Connectez-vous pour continuer",
@@ -1033,6 +1042,10 @@ const nl: Record<TranslationKey, string> = {
   "auth.signedInToast": "Ingelogd als {email}.",
   "auth.signedOutToast": "Uitgelogd.",
   "auth.failed": "Authenticatie mislukt.",
+  "auth.displayName": "Weergavenaam (optioneel)",
+  "auth.displayNamePlaceholder": "Hoe mogen we je noemen?",
+  "auth.cardTitle": "Log in bij je tutor",
+  "auth.cardSubtitle": "Stel vragen en krijg antwoorden op basis van je eigen cursussen.",
 
   // Blocking sign-in gate (shown when the backend enforces authentication).
   "gate.title": "Log in om verder te gaan",

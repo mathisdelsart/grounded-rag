@@ -145,6 +145,9 @@ class RegisterRequest(BaseModel):
 
     email: str = Field(min_length=1)
     password: str = Field(min_length=1)
+    # Optional friendly name shown in the UI instead of the email. Trimmed and
+    # coerced to ``None`` when blank in ``register_user``.
+    display_name: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -159,6 +162,8 @@ class UserOut(BaseModel):
 
     id: int
     email: str
+    # Friendly name shown in the UI; ``None`` falls back to the email client-side.
+    display_name: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -214,7 +219,7 @@ def _resolve_user_from_token(token: str) -> UserOut:
                 detail="Invalid or expired token.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return UserOut(id=user.id, email=user.email)
+        return UserOut(id=user.id, email=user.email, display_name=user.display_name)
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> UserOut:
@@ -251,6 +256,7 @@ def register_user(payload: RegisterRequest) -> UserOut:
     (normalized) email already exists. The plaintext password is never stored.
     """
     email, password = validate_registration(payload.email, payload.password)
+    display_name = (payload.display_name or "").strip() or None
     with get_session() as session:
         existing = session.scalar(select(User).where(User.email == email))
         if existing is not None:
@@ -258,10 +264,10 @@ def register_user(payload: RegisterRequest) -> UserOut:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="An account with this email already exists.",
             )
-        user = User(email=email, hashed_password=hash_password(password))
+        user = User(email=email, hashed_password=hash_password(password), display_name=display_name)
         session.add(user)
         session.flush()
-        return UserOut(id=user.id, email=user.email)
+        return UserOut(id=user.id, email=user.email, display_name=user.display_name)
 
 
 def login_user(payload: LoginRequest) -> TokenResponse:

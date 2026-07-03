@@ -86,6 +86,37 @@ def test_register_creates_user_and_hashes_password(client):
         assert auth_mod.verify_password("supersecret", user.hashed_password)
 
 
+def test_register_with_display_name_returns_it(client):
+    response = client.post(
+        "/auth/register",
+        json={"email": "named@example.com", "password": "supersecret", "display_name": "  Ada  "},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["display_name"] == "Ada"  # trimmed
+
+    # The display name is echoed by /auth/me too.
+    token = client.post(
+        "/auth/login", json={"email": "named@example.com", "password": "supersecret"}
+    ).json()["access_token"]
+    me = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
+    assert me["display_name"] == "Ada"
+
+
+def test_register_without_display_name_is_null(client):
+    body = _register(client, "plain@example.com", "supersecret").json()
+    assert body["display_name"] is None
+
+
+def test_register_blank_display_name_is_null(client):
+    response = client.post(
+        "/auth/register",
+        json={"email": "blank@example.com", "password": "supersecret", "display_name": "   "},
+    )
+    assert response.status_code == 201
+    assert response.json()["display_name"] is None
+
+
 def test_register_normalizes_email(client):
     response = _register(client, "  Bob@Example.COM ", "supersecret")
     assert response.status_code == 201

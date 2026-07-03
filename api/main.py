@@ -248,14 +248,14 @@ STUDENT_FOREIGN = "This student belongs to another account."
 def _resolve_student(session: Any, external_id: str, user: UserOut | None) -> Student:
     """Get-or-create the student and, when authenticated, claim/enforce ownership.
 
-    Anonymous requests (``user is None``) behave exactly as before: the student
-    is keyed solely by ``external_id`` and left unlinked. When a valid bearer
-    token is present, an unowned student is linked to that user. Once a student
-    has an owner it is never re-claimed, so with ``require_auth`` off a student
-    already owned by someone else is left untouched (MVP behaviour). With
-    ``require_auth`` on (``user`` is guaranteed non-None), touching a student that
-    belongs to a *different* account is rejected with 403, giving true tenant
-    isolation. This never changes the answer, only the ownership link.
+    Anonymous requests (``user is None``, i.e. no bearer token) behave exactly as
+    before: the student is keyed solely by ``external_id`` and left unlinked. As
+    soon as a valid bearer token is present the caller is isolated to their own
+    students: an unowned student is linked to that user, and touching a student
+    that belongs to a *different* account is rejected with 403. This holds
+    whenever a user is authenticated, independently of ``require_auth`` (that flag
+    only additionally *forces* a token via the sign-in gate). This never changes
+    the answer, only the ownership link.
     """
     student = get_or_create_student(session, external_id)
     if user is None:
@@ -263,7 +263,7 @@ def _resolve_student(session: Any, external_id: str, user: UserOut | None) -> St
     if student.user_id is None:
         student.user_id = user.id
         session.flush()
-    elif student.user_id != user.id and get_settings().require_auth:
+    elif student.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=STUDENT_FOREIGN)
     return student
 
@@ -271,16 +271,18 @@ def _resolve_student(session: Any, external_id: str, user: UserOut | None) -> St
 def _student_for_read(session: Any, external_id: str, user: UserOut | None) -> Student | None:
     """Look up a student by ``external_id`` for a read/scoped route.
 
-    Returns the ``Student`` or ``None``. In ``require_auth`` mode, a student that
-    exists but is not owned by ``user`` is treated as inaccessible: raise 403
-    (never leak another tenant's data). A missing student still returns ``None``
-    so callers keep their existing empty/404 behaviour. With ``require_auth`` off
-    this is a plain lookup, so the anonymous flow is unchanged.
+    Returns the ``Student`` or ``None``. Whenever a caller is authenticated (a
+    bearer token was sent, so ``user`` is not ``None``), a student that exists but
+    is not owned by ``user`` is treated as inaccessible: raise 403 (never leak
+    another tenant's data). This holds independently of ``require_auth``. A missing
+    student still returns ``None`` so callers keep their existing empty/404
+    behaviour. For an anonymous caller (``user is None``) this is a plain lookup,
+    so the anonymous flow is unchanged.
     """
     student = session.scalar(select(Student).where(Student.external_id == external_id))
     if student is None:
         return None
-    if get_settings().require_auth and user is not None and student.user_id != user.id:
+    if user is not None and student.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=STUDENT_FOREIGN)
     return student
 

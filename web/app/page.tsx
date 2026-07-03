@@ -45,14 +45,20 @@ export default function Home() {
   const [sourcesMax, setSourcesMax] = useState(DEFAULT_SOURCES_MAX);
   const [token, setToken] = useState("");
   const [authEmail, setAuthEmail] = useState("");
+  const [authName, setAuthName] = useState("");
   const [active, setActive] = useState("ask");
   // Enforced multi-user mode, learned from GET /config. When true and the user
   // is not signed in, a blocking login gate replaces the app. Defaults to false
   // so an unreachable backend never locks the anonymous MVP flow.
   const [requireAuth, setRequireAuth] = useState(false);
-  // The signed-in user's id, used to derive an account-scoped student id in
-  // enforced mode so two accounts on one browser never share data.
+  // The signed-in user's id, used to derive an account-scoped student id so two
+  // accounts on one browser never share data. Resolved whenever a token exists,
+  // independently of `requireAuth`, so being logged in always isolates the view.
   const [authUserId, setAuthUserId] = useState<number | null>(null);
+  // True while a stored token is being resolved to a user (the `me()` call is in
+  // flight). The tool's data render is gated behind this so the first requests
+  // never fire on the device id and then flip to the account-scoped id.
+  const [authResolving, setAuthResolving] = useState(false);
 
   // Cross-tab state lifted to the page so the Ask and Re-explain flows can share
   // the last answer. The Exercise panel owns its own exercise/grade state.
@@ -72,8 +78,13 @@ export default function Home() {
     setStudentId(id);
     setBaseUrl(readLocal(KEYS.baseUrl));
     setApiKey(readLocal(KEYS.apiKey));
-    setToken(readLocal(KEYS.authToken));
+    const storedToken = readLocal(KEYS.authToken);
+    setToken(storedToken);
     setAuthEmail(readLocal(KEYS.authEmail));
+    setAuthName(readLocal(KEYS.authName));
+    // A stored token must resolve before the tool renders any data, so start in
+    // the resolving state when one is present (cleared by the me() effect).
+    if (storedToken) setAuthResolving(true);
     const storedSources = Number.parseInt(readLocal(KEYS.sourcesMax), 10);
     if (Number.isFinite(storedSources)) setSourcesMax(storedSources);
     const storedSession = readLocal(KEYS.sessionId);
@@ -113,44 +124,68 @@ export default function Home() {
     };
   }, [ready, baseUrl, apiKey]);
 
-  // In enforced mode, resolve the signed-in user's id so the student id can be
-  // scoped to the account. Cleared when signed out or when enforcement is off.
+  // Resolve the signed-in user's id whenever a token exists (independently of
+  // `requireAuth`), so being logged in always isolates the view. The resolved
+  // display name/email are refreshed from the canonical `me()` response. A
+  // stored token that no longer resolves is treated as logged-out (cleared)
+  // rather than silently falling back to the device id.
   useEffect(() => {
-    if (!requireAuth || !token) {
+    if (!token) {
       setAuthUserId(null);
+      setAuthResolving(false);
       return;
     }
     let cancelled = false;
+    setAuthResolving(true);
     me({ ...config, token })
       .then((user) => {
-        if (!cancelled) setAuthUserId(user.id);
+        if (cancelled) return;
+        setAuthUserId(user.id);
+        setAuthEmail(user.email);
+        setAuthName(user.display_name ?? "");
+        writeLocal(KEYS.authEmail, user.email);
+        writeLocal(KEYS.authName, user.display_name ?? "");
+        setAuthResolving(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        // Stored token is stale/invalid: revert to the anonymous device flow.
+        onLogout();
+        setAuthResolving(false);
+      });
     return () => {
       cancelled = true;
     };
     // `config` is derived from token/baseUrl/apiKey; re-run when those change.
-  }, [requireAuth, token, config]);
+    // `onLogout` is a stable in-component callback, deliberately not a dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, config]);
 
-  // The student id the tool actually uses. In enforced mode it is scoped to the
+  // The student id the tool actually uses. Once logged in it is scoped to the
   // account ("u<id>") so the same account is consistent across devices and two
-  // accounts on one browser never collide; otherwise the device id is kept
+  // accounts on one browser never collide; logged out, the device id is kept
   // exactly as before.
-  const effectiveStudentId =
-    requireAuth && authUserId != null ? `u${authUserId}` : studentId;
+  const effectiveStudentId = authUserId != null ? `u${authUserId}` : studentId;
 
-  function onLogin(nextToken: string, nextEmail: string) {
+  function onLogin(nextToken: string, nextEmail: string, nextName?: string | null) {
     setToken(nextToken);
     setAuthEmail(nextEmail);
+    setAuthName(nextName ?? "");
     writeLocal(KEYS.authToken, nextToken);
     writeLocal(KEYS.authEmail, nextEmail);
+    writeLocal(KEYS.authName, nextName ?? "");
   }
 
   function onLogout() {
     setToken("");
     setAuthEmail("");
+    setAuthName("");
     writeLocal(KEYS.authToken, "");
     writeLocal(KEYS.authEmail, "");
+    writeLocal(KEYS.authName, "");
+    // Drop the active thread so a stale account thread id never lingers into the
+    // anonymous (device-scoped) view after signing out.
+    selectSession(null);
   }
 
   function saveSettings(next: {
@@ -217,6 +252,7 @@ export default function Home() {
           <LanguageToggle />
           <AuthMenu
             config={config}
+            name={authName || null}
             email={authEmail || null}
             onLogin={onLogin}
             onLogout={onLogout}
@@ -285,6 +321,16 @@ export default function Home() {
                 <span aria-hidden className="w-[52px]" />
               </div>
 
+              {authResolving ? (
+                // A stored token is still resolving to an account. Hold the tool
+                // behind a light skeleton so no request fires on the device id
+                // and then flips to the account-scoped id once it resolves.
+                <div className="space-y-6 p-6 sm:p-8" aria-busy="true">
+                  <div className="h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+                  <div className="h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+                  <div className="h-64 animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+                </div>
+              ) : (
               <div className="space-y-6 p-6 sm:p-8">
                 <SettingsPanel
                   studentId={effectiveStudentId}
@@ -352,6 +398,7 @@ export default function Home() {
                   )}
                 </div>
               </div>
+              )}
             </div>
           </div>
         </section>
