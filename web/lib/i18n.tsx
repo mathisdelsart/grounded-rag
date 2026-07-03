@@ -161,6 +161,9 @@ const en = {
   "settings.apiKey": "API key",
   "settings.apiKeyHint": "Optional — sent as the X-API-Key header when set.",
   "settings.apiKeyPlaceholder": "(none)",
+  "settings.sourcesMax": "Max sources",
+  "settings.sourcesMaxHint":
+    "Maximum candidate sources to retrieve per question. Only the sources actually used are shown; a higher value can slow a local model.",
   "common.cancel": "Cancel",
   "common.save": "Save",
 
@@ -220,6 +223,7 @@ const en = {
   "ask.empty.description": "Ask a question above to see a grounded, cited explanation.",
   "ask.reexplainPrompt": "Didn't get it? Re-explain at a level:",
   "ask.reexplain": "Re-explain",
+  "ask.rephrasing": "Rephrasing…",
 
   // Answer feedback
   "feedback.prompt": "Was this answer helpful?",
@@ -595,6 +599,9 @@ const fr: Record<TranslationKey, string> = {
   "settings.apiKey": "Clé API",
   "settings.apiKeyHint": "Optionnel — envoyée comme en-tête X-API-Key si définie.",
   "settings.apiKeyPlaceholder": "(aucune)",
+  "settings.sourcesMax": "Sources max",
+  "settings.sourcesMaxHint":
+    "Nombre maximal de sources candidates à récupérer par question. Seules les sources réellement utilisées sont affichées ; une valeur élevée peut ralentir un modèle local.",
   "common.cancel": "Annuler",
   "common.save": "Enregistrer",
 
@@ -656,6 +663,7 @@ const fr: Record<TranslationKey, string> = {
     "Posez une question ci-dessus pour voir une explication ancrée et citée.",
   "ask.reexplainPrompt": "Pas compris ? Réexpliquer à un niveau :",
   "ask.reexplain": "Réexpliquer",
+  "ask.rephrasing": "Reformulation…",
 
   // Answer feedback
   "feedback.prompt": "Cette réponse vous a-t-elle été utile ?",
@@ -1026,6 +1034,9 @@ const nl: Record<TranslationKey, string> = {
   "settings.apiKey": "API-sleutel",
   "settings.apiKeyHint": "Optioneel — verzonden als de X-API-Key-header indien ingesteld.",
   "settings.apiKeyPlaceholder": "(geen)",
+  "settings.sourcesMax": "Max. bronnen",
+  "settings.sourcesMaxHint":
+    "Maximaal aantal kandidaat-bronnen dat per vraag wordt opgehaald. Alleen de daadwerkelijk gebruikte bronnen worden getoond; een hogere waarde kan een lokaal model vertragen.",
   "common.cancel": "Annuleren",
   "common.save": "Opslaan",
 
@@ -1084,6 +1095,7 @@ const nl: Record<TranslationKey, string> = {
   "ask.empty.description": "Stel hierboven een vraag voor een onderbouwde, geciteerde uitleg.",
   "ask.reexplainPrompt": "Niet begrepen? Leg opnieuw uit op niveau:",
   "ask.reexplain": "Heruitleggen",
+  "ask.rephrasing": "Opnieuw formuleren…",
 
   // Answer feedback
   "feedback.prompt": "Was dit antwoord nuttig?",

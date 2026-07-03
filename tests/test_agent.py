@@ -13,7 +13,7 @@ from agent.graph import INTENTS, build_graph, classify_intent, route
 from agent.nodes.explain import explain
 from agent.nodes.generate import generate
 from agent.nodes.grade import grade
-from agent.nodes.reexplain import reexplain
+from agent.nodes.reexplain import reexplain, stream_reexplain
 from core.answer import REFUSAL
 from ingestion.schema import Chunk, Retrieved
 
@@ -59,6 +59,13 @@ class _FakeLLM:
         self.calls.append(messages)
         self.configs.append(config)
         return _FakeMessage(self.reply)
+
+    def stream(self, messages, config=None):
+        """Yield the reply as streamed chunks so streaming nodes can be tested."""
+        self.calls.append(messages)
+        self.configs.append(config)
+        for word in self.reply.split(" "):
+            yield _FakeMessage(word + " ")
 
 
 @pytest.fixture
@@ -460,6 +467,22 @@ def test_reexplain_picks_tutor_turn_despite_malformed_turns(fake_llm):
     # The most recent valid tutor turn is used, earlier ones are not.
     assert "Latest valid explanation [3]." in human_msg
     assert "Older explanation." not in human_msg
+
+
+def test_stream_reexplain_yields_tokens_then_done(fake_llm):
+    # The streaming variant emits token deltas, then a final done event carrying
+    # the fully assembled re-explanation. It grounds on the last tutor turn and
+    # runs no retrieval (no sources/stage events).
+    fake_llm["reply"] = "Even simpler version"
+    history = [{"role": "tutor", "content": "Original explanation [1]."}]
+    events = list(stream_reexplain({"message": "again", "history": history}))
+
+    tokens = [e["text"] for e in events if e["type"] == "token"]
+    assert "".join(tokens).strip() == "Even simpler version"
+    assert events[-1] == {"type": "done", "answer": "Even simpler version"}
+    # The previous tutor explanation was fed to the model, not re-retrieved.
+    human_msg = fake_llm["last"].calls[0][-1][1]
+    assert "Original explanation [1]." in human_msg
 
 
 # --- adaptive re-explanation by level ----------------------------------------
