@@ -524,10 +524,12 @@ export async function exercise(
   config?: ConnectionConfig,
   course?: string | null,
   chapter?: string | null,
+  sessionId?: number | null,
 ): Promise<ExerciseResponse> {
   const payload: Record<string, unknown> = { student_id: studentId, notion };
   if (course) payload.course = course;
   if (chapter) payload.chapter = chapter;
+  if (sessionId != null) payload.session_id = sessionId;
   return request<ExerciseResponse>(
     "/exercise",
     {
@@ -569,10 +571,12 @@ export async function quiz(
   config?: ConnectionConfig,
   course?: string | null,
   chapter?: string | null,
+  sessionId?: number | null,
 ): Promise<QuizResponse> {
   const payload: Record<string, unknown> = { student_id: studentId, notion, n };
   if (course) payload.course = course;
   if (chapter) payload.chapter = chapter;
+  if (sessionId != null) payload.session_id = sessionId;
   return request<QuizResponse>(
     "/quiz",
     {

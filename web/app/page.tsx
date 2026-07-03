@@ -327,9 +327,19 @@ export default function Home() {
                     />
                   )}
                   {active === "exercise" && (
-                    <ExercisePanel studentId={effectiveStudentId} config={config} />
+                    <ExercisePanel
+                      studentId={effectiveStudentId}
+                      config={config}
+                      sessionId={activeSessionId}
+                    />
                   )}
-                  {active === "quiz" && <QuizPanel studentId={effectiveStudentId} config={config} />}
+                  {active === "quiz" && (
+                    <QuizPanel
+                      studentId={effectiveStudentId}
+                      config={config}
+                      sessionId={activeSessionId}
+                    />
+                  )}
                   {active === "threads" && (
                     <ThreadsPanel
                       studentId={effectiveStudentId}

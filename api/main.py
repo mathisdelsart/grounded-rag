@@ -305,6 +305,38 @@ def _resolve_session_id(session: Any, student_id: int, session_id: int | None) -
     return session_id if thread is not None else None
 
 
+# Distinct message roles for the activity feed. ``user``/``assistant`` are the
+# Q&A turns written by /ask and /reexplain; these two label exercise and quiz
+# activity so the history can style them apart. ``Message.role`` is a plain
+# string column (no enum/CHECK), so new values are safe, and ``to_history`` maps
+# unknown roles through unchanged — they are never treated as tutor context, so
+# reexplain keeps reformulating the last real answer only.
+ROLE_EXERCISE = "exercise"
+ROLE_QUIZ = "quiz"
+
+
+def _record_activity(
+    external_id: str, user: UserOut | None, session_id: int | None, *, role: str, content: str
+) -> None:
+    """Persist one activity item (exercise/quiz) as a message, like /ask does.
+
+    The student is resolved (and ownership enforced) exactly as for a question,
+    and the item is attached to the active thread when ``session_id`` names one
+    of the student's threads. Kept concise on purpose: callers pass a short
+    summary, never a full JSON blob.
+    """
+    with get_session(_engine) as session:
+        student = _resolve_student(session, external_id, user)
+        thread_id = _resolve_session_id(session, student.id, session_id)
+        add_message(
+            session,
+            student_id=student.id,
+            role=role,
+            content=content,
+            session_id=thread_id,
+        )
+
+
 class AskRequest(BaseModel):
     """A question to answer from the course, on behalf of a student.
 
@@ -373,6 +405,9 @@ class ExerciseRequest(BaseModel):
     notion: str
     course: str | None = None
     chapter: str | None = None
+    # Optional thread to attach the resulting activity item to, like /ask. When
+    # None (or not owned by the student) the item stays in the flat history.
+    session_id: int | None = None
 
 
 class ExerciseResponse(BaseModel):
@@ -419,6 +454,9 @@ class QuizRequest(BaseModel):
     n: int = Field(default=3, ge=1, le=10)
     course: str | None = None
     chapter: str | None = None
+    # Optional thread to attach the resulting activity item to, like /ask. When
+    # None (or not owned by the student) the item stays in the flat history.
+    session_id: int | None = None
 
 
 class QuizQuestionOut(BaseModel):
@@ -976,6 +1014,16 @@ def exercise(request: ExerciseRequest, user: UserOut | None = DataUser) -> dict[
     # generate always populates "exercise" (a built exercise or a refusal).
     built = state.get("exercise")
     assert built is not None
+    # Record the generated exercise as an activity turn so it shows in history
+    # next to the Q&A. Skip on refusal: an uncovered notion produces no activity.
+    if not built["refused"]:
+        _record_activity(
+            request.student_id,
+            user,
+            request.session_id,
+            role=ROLE_EXERCISE,
+            content=built["problem"],
+        )
     return {"problem": built["problem"], "refused": built["refused"], "id": built.get("id")}
 
 
@@ -1015,13 +1063,26 @@ def quiz(request: QuizRequest, user: UserOut | None = DataUser) -> dict[str, Any
     """
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
-    return generate_quiz(
+    result = generate_quiz(
         request.notion,
         request.n,
         request.student_id,
         course=request.course,
         chapter=request.chapter,
     )
+    # Record a concise activity turn (the notion + question count), never the full
+    # quiz JSON. Skip on refusal: an uncovered notion produces no questions.
+    if not result["refused"] and result["questions"]:
+        count = len(result["questions"])
+        summary = f"{result['notion']} ({count} question{'s' if count != 1 else ''})"
+        _record_activity(
+            request.student_id,
+            user,
+            request.session_id,
+            role=ROLE_QUIZ,
+            content=summary,
+        )
+    return result
 
 
 @app.post(
