@@ -296,6 +296,7 @@ const en = {
   "quiz.gradeAnswer": "Grade answer",
   "quiz.score": "Score",
   "quiz.gradeAll": "Grade all",
+  "quiz.gradingAll": "Grading your {count} answers…",
   "quiz.finalScore": "Final score",
   "quiz.recommendationTitle": "Recommendation",
 
@@ -748,6 +749,7 @@ const fr: Record<TranslationKey, string> = {
   "quiz.gradeAnswer": "Corriger la réponse",
   "quiz.score": "Note",
   "quiz.gradeAll": "Tout corriger",
+  "quiz.gradingAll": "Correction de vos {count} réponses…",
   "quiz.finalScore": "Note finale",
   "quiz.recommendationTitle": "Recommandation",
 
@@ -1183,6 +1185,7 @@ const nl: Record<TranslationKey, string> = {
   "quiz.gradeAnswer": "Antwoord beoordelen",
   "quiz.score": "Score",
   "quiz.gradeAll": "Alles beoordelen",
+  "quiz.gradingAll": "Je {count} antwoorden worden beoordeeld…",
   "quiz.finalScore": "Eindscore",
   "quiz.recommendationTitle": "Aanbeveling",
 

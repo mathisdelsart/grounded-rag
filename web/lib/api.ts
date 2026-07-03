@@ -590,6 +590,7 @@ export async function gradeQuizAnswer(
   quizId: number,
   questionId: number,
   answer: string,
+  rigor: Rigor = "standard",
   config?: ConnectionConfig,
 ): Promise<GradeResponse> {
   return request<GradeResponse>(
@@ -597,7 +598,7 @@ export async function gradeQuizAnswer(
     {
       method: "POST",
       headers: buildHeaders(config, true),
-      body: JSON.stringify({ student_id: studentId, question_id: questionId, answer }),
+      body: JSON.stringify({ student_id: studentId, question_id: questionId, answer, rigor }),
     },
     config,
   );
@@ -608,6 +609,7 @@ export async function gradeQuizAll(
   studentId: string,
   quizId: number,
   answers: QuizGradeAllItem[],
+  rigor: Rigor = "standard",
   config?: ConnectionConfig,
 ): Promise<QuizSummaryResponse> {
   return request<QuizSummaryResponse>(
@@ -615,7 +617,7 @@ export async function gradeQuizAll(
     {
       method: "POST",
       headers: buildHeaders(config, true),
-      body: JSON.stringify({ student_id: studentId, answers }),
+      body: JSON.stringify({ student_id: studentId, answers, rigor }),
     },
     config,
   );
