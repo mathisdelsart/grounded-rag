@@ -213,7 +213,7 @@ def test_history_unknown_student_is_empty(client):
 
 
 def test_clear_history_removes_all_turns(client, monkeypatch):
-    def fake_answer(question, *, k=5, course=None, chapter=None):
+    def fake_answer(question, *, k=5, course=None, chapter=None, language=None):
         return {"answer": "a", "refused": False, "sources": [], "raw": "a"}
 
     monkeypatch.setattr(api_main, "answer", fake_answer)
