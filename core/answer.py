@@ -132,6 +132,7 @@ def _retrieve(
     course: str | None,
     chapter: str | None,
     owner: str | None = None,
+    api_key: str | None = None,
 ) -> list[Retrieved]:
     """Dispatch to single-, multi-query or HyDE retrieval based on settings.
 
@@ -148,9 +149,13 @@ def _retrieve(
     """
     settings = get_settings()
     if settings.multi_query:
-        return retrieve_multi(question, k=k, course=course, chapter=chapter, owner=owner)
+        return retrieve_multi(
+            question, k=k, course=course, chapter=chapter, owner=owner, api_key=api_key
+        )
     if settings.hyde:
-        return retrieve(question, k=k, course=course, chapter=chapter, owner=owner, hyde=True)
+        return retrieve(
+            question, k=k, course=course, chapter=chapter, owner=owner, hyde=True, api_key=api_key
+        )
     return retrieve(question, k=k, course=course, chapter=chapter, owner=owner)
 
 
@@ -172,6 +177,7 @@ def answer(
     chapter: str | None = None,
     owner: str | None = None,
     language: str | None = None,
+    api_key: str | None = None,
 ) -> dict:
     """Answer a question grounded in the course, or refuse if uncovered.
 
@@ -189,10 +195,15 @@ def answer(
     (and chapter); when both are None the whole collection is searched. ``owner``
     strictly scopes retrieval to the caller's own material (no shared/legacy).
     ``language`` (a locale code) sets the default answer language; when None the
-    model answers in the question's own language.
+    model answers in the question's own language. ``api_key`` is an optional
+    per-request OpenAI key: when set, the explanation (and any HyDE/multi-query
+    router call) runs on the visitor's own OpenAI model instead of the free
+    default (see :func:`core.config.get_llm`).
     """
     with timer("retrieval"):
-        results = _retrieve(question, k=k, course=course, chapter=chapter, owner=owner)
+        results = _retrieve(
+            question, k=k, course=course, chapter=chapter, owner=owner, api_key=api_key
+        )
     if not results:
         return {
             "answer": REFUSAL,
@@ -206,7 +217,7 @@ def answer(
     prompt = f"Sources:\n{format_numbered_sources(results)}\n\nQuestion: {question}"
     with timer("llm"):
         raw = (
-            get_llm("explain")
+            get_llm("explain", api_key=api_key)
             .invoke(
                 [("system", _system_prompt(language)), ("human", prompt)],
                 config={"callbacks": get_callbacks()},
@@ -262,6 +273,7 @@ def stream_answer(
     chapter: str | None = None,
     owner: str | None = None,
     language: str | None = None,
+    api_key: str | None = None,
 ) -> Iterator[dict]:
     """Stream a grounded answer token by token, mirroring :func:`answer`.
 
@@ -289,7 +301,9 @@ def stream_answer(
     # about to write. These reflect actual work, not a timer.
     yield {"type": "stage", "stage": "retrieving"}
     with timer("retrieval"):
-        results = _retrieve(question, k=k, course=course, chapter=chapter, owner=owner)
+        results = _retrieve(
+            question, k=k, course=course, chapter=chapter, owner=owner, api_key=api_key
+        )
     if not results:
         yield {"type": "token", "text": REFUSAL}
         yield {
@@ -305,7 +319,7 @@ def stream_answer(
     prompt = f"Sources:\n{format_numbered_sources(results)}\n\nQuestion: {question}"
     parts: list[str] = []
     with timer("llm"):
-        for piece in get_llm("explain").stream(
+        for piece in get_llm("explain", api_key=api_key).stream(
             [("system", _system_prompt(language)), ("human", prompt)],
             config={"callbacks": get_callbacks()},
         ):

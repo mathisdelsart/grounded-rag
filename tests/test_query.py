@@ -26,7 +26,9 @@ def _fake_llm(content):
 
 
 def _patch_llm(monkeypatch, content):
-    monkeypatch.setattr(query_mod, "get_llm", lambda role="default": _fake_llm(content))
+    monkeypatch.setattr(
+        query_mod, "get_llm", lambda role="default", api_key=None: _fake_llm(content)
+    )
 
 
 def test_expand_query_returns_original_plus_rewrites(monkeypatch):
@@ -63,7 +65,7 @@ def test_expand_query_dedups_case_insensitively(monkeypatch):
 
 
 def test_expand_query_falls_back_when_llm_raises(monkeypatch):
-    def _raising_llm(role="default"):
+    def _raising_llm(role="default", api_key=None):
         class _LLM:
             def invoke(self, messages, config=None):
                 raise RuntimeError("provider down")
@@ -86,7 +88,7 @@ def test_expand_query_falls_back_on_non_string_content(monkeypatch):
 
 def test_expand_query_zero_n_returns_original_only(monkeypatch):
     # n<=0 short-circuits without touching the LLM.
-    def _boom(role="default"):
+    def _boom(role="default", api_key=None):
         raise AssertionError("LLM must not be called when n<=0")
 
     monkeypatch.setattr(query_mod, "get_llm", _boom)
@@ -161,7 +163,9 @@ def _patch_retrieval_env(monkeypatch):
 def test_retrieve_multi_fuses_and_dedups_across_subqueries(monkeypatch):
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch, multi_query=True, multi_query_n=2)
-    monkeypatch.setattr(retrieval, "expand_query", lambda q, n: [q, "rewrite-a", "rewrite-b"])
+    monkeypatch.setattr(
+        retrieval, "expand_query", lambda q, n, api_key=None: [q, "rewrite-a", "rewrite-b"]
+    )
 
     _FakeQdrantClient.by_query = {
         "q": [_point("p1", 0.90, "alpha")],
@@ -183,7 +187,7 @@ def test_retrieve_multi_fuses_and_dedups_across_subqueries(monkeypatch):
 def test_retrieve_multi_truncates_to_k(monkeypatch):
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch, multi_query=True)
-    monkeypatch.setattr(retrieval, "expand_query", lambda q, n: [q, "r1"])
+    monkeypatch.setattr(retrieval, "expand_query", lambda q, n, api_key=None: [q, "r1"])
     _FakeQdrantClient.by_query = {
         "q": [_point("p1", 0.9, "a"), _point("p2", 0.8, "b")],
         "r1": [_point("p3", 0.7, "c")],
@@ -197,7 +201,7 @@ def test_retrieve_multi_refuses_when_nothing_clears_threshold(monkeypatch):
     # so the fused pool is empty -> the answer layer refuses.
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch, multi_query=True)
-    monkeypatch.setattr(retrieval, "expand_query", lambda q, n: [q, "r1", "r2"])
+    monkeypatch.setattr(retrieval, "expand_query", lambda q, n, api_key=None: [q, "r1", "r2"])
     _FakeQdrantClient.by_query = {}  # no query yields candidates
     assert retrieval.retrieve_multi("off-topic") == []
 
@@ -205,7 +209,7 @@ def test_retrieve_multi_refuses_when_nothing_clears_threshold(monkeypatch):
 def test_retrieve_multi_keeps_threshold_per_subquery(monkeypatch):
     _patch_retrieval_env(monkeypatch)
     settings = _settings(monkeypatch, multi_query=True)
-    monkeypatch.setattr(retrieval, "expand_query", lambda q, n: [q])
+    monkeypatch.setattr(retrieval, "expand_query", lambda q, n, api_key=None: [q])
     _FakeQdrantClient.by_query = {"q": [_point("p1", 0.9, "a")]}
     retrieval.retrieve_multi("q")
     # Each sub-query still passes the configured similarity threshold to Qdrant.
@@ -215,7 +219,7 @@ def test_retrieve_multi_keeps_threshold_per_subquery(monkeypatch):
 def test_retrieve_multi_composes_with_reranker(monkeypatch):
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch, multi_query=True, reranker_model="fake-model", rerank_candidates=20)
-    monkeypatch.setattr(retrieval, "expand_query", lambda q, n: [q, "r1"])
+    monkeypatch.setattr(retrieval, "expand_query", lambda q, n, api_key=None: [q, "r1"])
     _FakeQdrantClient.by_query = {
         "q": [_point("p1", 0.91, "alpha")],
         "r1": [_point("p2", 0.80, "bravo")],
@@ -234,7 +238,7 @@ def test_retrieve_multi_composes_with_reranker(monkeypatch):
 def test_retrieve_multi_reranks_against_original_question(monkeypatch):
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch, multi_query=True, reranker_model="fake-model")
-    monkeypatch.setattr(retrieval, "expand_query", lambda q, n: [q, "rewrite"])
+    monkeypatch.setattr(retrieval, "expand_query", lambda q, n, api_key=None: [q, "rewrite"])
     _FakeQdrantClient.by_query = {"the real question": [_point("p1", 0.9, "a")], "rewrite": []}
     seen = {}
 
@@ -268,7 +272,7 @@ def test_answer_uses_single_query_when_multi_query_off(monkeypatch):
         called["single"] += 1
         return []
 
-    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None):
+    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None, api_key=None):
         called["multi"] += 1
         return []
 
@@ -286,7 +290,7 @@ def test_answer_uses_multi_query_when_enabled(monkeypatch):
         called["single"] += 1
         return []
 
-    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None):
+    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None, api_key=None):
         called["multi"] += 1
         return []
 

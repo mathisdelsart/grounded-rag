@@ -209,9 +209,10 @@ def test_get_llm_forwards_api_key_for_openai_model(monkeypatch):
     assert captured["kwargs"].get("api_key") == "sk-test"
 
 
-def test_get_llm_does_not_forward_api_key_for_groq_model(monkeypatch):
-    # A non-OpenAI resolved model (Groq) must ignore the override so the key can
-    # never break the Groq/Ollama paths (or leak to the wrong provider).
+def test_get_llm_key_forces_openai_for_groq_role(monkeypatch):
+    # New semantics: a per-call key overrides the global provider EVERYWHERE. A
+    # normally-Groq role resolves to the OpenAI default and forwards the key, so a
+    # visitor's own key drives a premium model for Ask/exercise/quiz/grade too.
     monkeypatch.delenv("LLM_EXPLAIN", raising=False)
     _fresh_settings(monkeypatch, LLM_PROVIDER="groq")
 
@@ -224,12 +225,14 @@ def test_get_llm_does_not_forward_api_key_for_groq_model(monkeypatch):
 
     monkeypatch.setattr(config, "init_chat_model", fake_init)
     config.get_llm("explain", api_key="sk-test")
-    assert captured["model"].startswith("groq:")
-    assert "api_key" not in captured["kwargs"]
+    assert captured["model"] == "gpt-4o-mini"
+    assert captured["kwargs"].get("api_key") == "sk-test"
+    assert captured["kwargs"].get("temperature") == 0
 
 
-def test_get_llm_does_not_forward_api_key_for_ollama_model(monkeypatch):
-    # An Ollama-resolved model likewise ignores the OpenAI override.
+def test_get_llm_key_forces_openai_over_ollama_provider(monkeypatch):
+    # Likewise under the global Ollama switch: a supplied key forces OpenAI (no
+    # ollama: prefix, no base_url) so the key can never be sent to the wrong host.
     monkeypatch.delenv("LLM_EXPLAIN", raising=False)
     _fresh_settings(monkeypatch, LLM_PROVIDER="ollama")
 
@@ -242,6 +245,62 @@ def test_get_llm_does_not_forward_api_key_for_ollama_model(monkeypatch):
 
     monkeypatch.setattr(config, "init_chat_model", fake_init)
     config.get_llm("explain", api_key="sk-test")
+    assert captured["model"] == "gpt-4o-mini"
+    assert captured["kwargs"].get("api_key") == "sk-test"
+    assert "base_url" not in captured["kwargs"]
+
+
+def test_get_llm_key_honours_openai_per_role_override(monkeypatch):
+    # An explicit OpenAI-named LLM_<ROLE> override is used verbatim when a key is
+    # supplied (a bigger OpenAI model for that role), still authenticated by the key.
+    _fresh_settings(monkeypatch, LLM_PROVIDER="groq", LLM_EXPLAIN="openai:gpt-4o")
+
+    captured = {}
+
+    def fake_init(model, **kwargs):
+        captured["model"] = model
+        captured["kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(config, "init_chat_model", fake_init)
+    config.get_llm("explain", api_key="sk-test")
+    assert captured["model"] == "openai:gpt-4o"
+    assert captured["kwargs"].get("api_key") == "sk-test"
+
+
+def test_get_llm_no_key_leaves_groq_resolution_unchanged(monkeypatch):
+    # Without a key the resolution is byte-identical to before: the free Groq
+    # model, no api_key kwarg. This is the default free path.
+    monkeypatch.delenv("LLM_EXPLAIN", raising=False)
+    _fresh_settings(monkeypatch, LLM_PROVIDER="groq")
+
+    captured = {}
+
+    def fake_init(model, **kwargs):
+        captured["model"] = model
+        captured["kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(config, "init_chat_model", fake_init)
+    config.get_llm("explain")
+    assert captured["model"].startswith("groq:")
+    assert "api_key" not in captured["kwargs"]
+
+
+def test_get_llm_no_key_leaves_ollama_resolution_unchanged(monkeypatch):
+    # Without a key an Ollama role is untouched: ollama: prefix, base_url, no key.
+    monkeypatch.delenv("LLM_EXPLAIN", raising=False)
+    _fresh_settings(monkeypatch, LLM_PROVIDER="ollama")
+
+    captured = {}
+
+    def fake_init(model, **kwargs):
+        captured["model"] = model
+        captured["kwargs"] = kwargs
+        return object()
+
+    monkeypatch.setattr(config, "init_chat_model", fake_init)
+    config.get_llm("explain")
     assert captured["model"].startswith("ollama:")
     assert "api_key" not in captured["kwargs"]
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type ConnectionConfig } from "@/lib/api";
 import { AuthCard } from "@/components/AuthCard";
 import { Button } from "@/components/Button";
+import { baseField } from "@/components/TextField";
 import { useToast } from "@/components/Toast";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
@@ -15,6 +16,10 @@ interface AuthMenuProps {
   username: string | null;
   onLogin: (token: string, username: string) => void;
   onLogout: () => void;
+  /** The visitor's own OpenAI key (shared with the Documents upload card). */
+  openaiKey: string;
+  /** Persist a new OpenAI key (writes localStorage in the parent). */
+  onOpenaiKeyChange: (value: string) => void;
 }
 
 /**
@@ -24,10 +29,19 @@ interface AuthMenuProps {
  * lifted to the parent (persisted to localStorage) and sent on requests as a
  * bearer token, additively to the optional API key.
  */
-export function AuthMenu({ config, username, onLogin, onLogout }: AuthMenuProps) {
+export function AuthMenu({
+  config,
+  username,
+  onLogin,
+  onLogout,
+  openaiKey,
+  onOpenaiKeyChange,
+}: AuthMenuProps) {
   const toast = useToast();
   const { t } = useT();
   const [open, setOpen] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+  const openaiKeyId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -113,18 +127,88 @@ export function AuthMenu({ config, username, onLogin, onLogout }: AuthMenuProps)
         )}
       </button>
 
-      {/* Signed-in: a compact dropdown with the identity and a logout action. */}
+      {/* Signed-in: a compact dropdown with the identity, the personal OpenAI-key
+          setting, and a logout action. */}
       {open && isAuthed && (
         <div
           role="dialog"
           aria-label={t("auth.aria")}
-          className="animate-fade-in absolute right-0 z-30 mt-2 w-72 rounded-xl border border-zinc-200 bg-white p-4 shadow-card-hover dark:border-zinc-700 dark:bg-zinc-900"
+          className="animate-fade-in absolute right-0 z-30 mt-2 w-80 rounded-xl border border-zinc-200 bg-white p-4 shadow-card-hover dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <div className="space-y-3">
+          <div className="space-y-4">
             <p className="text-sm text-zinc-600 dark:text-zinc-300">
               {t("auth.signedInAs")}{" "}
               <span className="font-medium text-zinc-900 dark:text-zinc-100">{label}</span>
             </p>
+
+            {/* Personal OpenAI key — a global, discoverable setting. When set, it
+                is sent with every request so all LLM calls use the visitor's own
+                premium model instead of the free one. Masked with a show/hide
+                toggle; persisted to the browser only (same storage as upload). */}
+            <div className="space-y-1.5 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+              <label
+                htmlFor={openaiKeyId}
+                className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                {t("settings.openaiKey.label")}
+              </label>
+              <div className="relative">
+                <input
+                  id={openaiKeyId}
+                  type={showKey ? "text" : "password"}
+                  autoComplete="off"
+                  placeholder="sk-…"
+                  value={openaiKey}
+                  onChange={(e) => onOpenaiKeyChange(e.target.value)}
+                  className={cn(baseField, "pr-11")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey((v) => !v)}
+                  aria-label={showKey ? t("settings.openaiKey.hide") : t("settings.openaiKey.show")}
+                  aria-pressed={showKey}
+                  className={cn(
+                    "absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg",
+                    "text-zinc-400 transition-colors hover:text-zinc-600 dark:hover:text-zinc-200",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
+                  )}
+                >
+                  {showKey ? (
+                    <svg
+                      aria-hidden
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <path d="M1 1l22 22" />
+                    </svg>
+                  ) : (
+                    <svg
+                      aria-hidden
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                {t("settings.openaiKey.note")}
+              </p>
+            </div>
+
             <Button variant="secondary" className="w-full" onClick={logout}>
               {t("auth.signOut")}
             </Button>

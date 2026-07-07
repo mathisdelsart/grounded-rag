@@ -49,7 +49,9 @@ def test_health_returns_ok(client):
 def test_ask_returns_grounded_answer_and_sources(client, monkeypatch):
     captured = {}
 
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         captured["question"] = question
         captured["k"] = k
         return {
@@ -81,7 +83,9 @@ def test_ask_returns_grounded_answer_and_sources(client, monkeypatch):
 def test_ask_threads_course_and_chapter_to_answer(client, monkeypatch):
     captured = {}
 
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         captured["course"] = course
         captured["chapter"] = chapter
         return {"answer": "ok (Course, p.1)", "refused": False, "sources": [], "raw": "ok"}
@@ -105,7 +109,9 @@ def test_ask_threads_course_and_chapter_to_answer(client, monkeypatch):
 def test_ask_defaults_course_and_chapter_to_none(client, monkeypatch):
     captured = {}
 
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         captured["course"] = course
         captured["chapter"] = chapter
         return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
@@ -121,7 +127,9 @@ def test_ask_defaults_course_and_chapter_to_none(client, monkeypatch):
 def test_ask_uses_default_k(client, monkeypatch):
     captured = {}
 
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         captured["k"] = k
         return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
 
@@ -133,7 +141,9 @@ def test_ask_uses_default_k(client, monkeypatch):
 
 
 def test_ask_surfaces_refusal(client, monkeypatch):
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         return {
             "answer": "This is not covered in the course material.",
             "refused": True,
@@ -151,7 +161,9 @@ def test_ask_surfaces_refusal(client, monkeypatch):
 
 
 def test_ask_persists_user_and_assistant_messages(client, monkeypatch):
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         return {
             "answer": "Grounded reply (Course, p.3)",
             "refused": False,
@@ -173,7 +185,9 @@ def test_ask_persists_user_and_assistant_messages(client, monkeypatch):
 def test_history_is_chronological_across_turns(client, monkeypatch):
     counter = {"n": 0}
 
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         counter["n"] += 1
         return {
             "answer": f"answer-{counter['n']}",
@@ -195,7 +209,9 @@ def test_history_is_chronological_across_turns(client, monkeypatch):
 
 
 def test_history_respects_limit(client, monkeypatch):
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         return {"answer": "a", "refused": False, "sources": [], "raw": "a"}
 
     monkeypatch.setattr(api_main, "answer", fake_answer)
@@ -213,7 +229,9 @@ def test_history_unknown_student_is_empty(client):
 
 
 def test_clear_history_removes_all_turns(client, monkeypatch):
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         return {"answer": "a", "refused": False, "sources": [], "raw": "a"}
 
     monkeypatch.setattr(api_main, "answer", fake_answer)
@@ -229,7 +247,9 @@ def test_clear_history_removes_all_turns(client, monkeypatch):
 
 
 def test_student_get_or_create_reuses_same_student(client, monkeypatch):
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
 
     monkeypatch.setattr(api_main, "answer", fake_answer)
@@ -445,7 +465,9 @@ def _parse_sse(text):
 def test_ask_stream_streams_tokens_then_sources(client, monkeypatch):
     captured = {}
 
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         captured["question"] = question
         captured["k"] = k
         yield {"type": "token", "text": "A wavelet "}
@@ -481,7 +503,9 @@ def test_ask_stream_streams_tokens_then_sources(client, monkeypatch):
 
 
 def test_ask_stream_persists_history_after_completion(client, monkeypatch):
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         yield {"type": "token", "text": "Grounded reply "}
         yield {"type": "token", "text": "[1]"}
         yield {
@@ -508,7 +532,9 @@ def test_ask_stream_persists_history_after_completion(client, monkeypatch):
 def test_ask_stream_surfaces_refusal(client, monkeypatch):
     refusal = "This is not covered in the course material."
 
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         yield {"type": "token", "text": refusal}
         yield {"type": "sources", "sources": [], "refused": True, "answer": refusal}
 
@@ -534,7 +560,9 @@ def test_ask_stream_surfaces_refusal(client, monkeypatch):
 def test_ask_stream_threads_course_and_chapter(client, monkeypatch):
     captured = {}
 
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         captured["course"] = course
         captured["chapter"] = chapter
         yield {"type": "sources", "sources": [], "refused": False, "answer": "ok"}
@@ -576,7 +604,9 @@ def _wait_for_ask_job(client, job_id, student_id, *, timeout=5.0):
 def test_ask_async_returns_job_and_reaches_done(client, monkeypatch):
     captured = {}
 
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         captured["question"] = question
         captured["k"] = k
         yield {"type": "stage", "stage": "retrieving"}
@@ -613,7 +643,9 @@ def test_ask_job_returns_partial_then_final(client, monkeypatch):
 
     release = threading.Event()
 
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         yield {"type": "token", "text": "partial "}
         # Block so the test can observe the partial state before completion.
         release.wait(timeout=5)
@@ -653,7 +685,9 @@ def test_ask_job_returns_partial_then_final(client, monkeypatch):
 
 
 def test_ask_async_persists_history_after_completion(client, monkeypatch):
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         yield {"type": "token", "text": "Grounded reply [1]"}
         yield {
             "type": "sources",
@@ -685,7 +719,9 @@ def test_ask_job_unknown_id_404(client):
 def test_ask_job_foreign_owner_is_404(client, monkeypatch):
     # Anonymous flow: a job created for one student id is invisible to another id
     # (owner mismatch), so it 404s rather than leaking the answer.
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         yield {"type": "token", "text": "secret [1]"}
         yield {
             "type": "sources",
@@ -712,7 +748,9 @@ def test_ask_job_foreign_owner_is_404(client, monkeypatch):
 def _seed_conversation(client, monkeypatch, student_id, question="Define X?"):
     """Run one /ask so the student has a prior tutor answer to re-explain."""
 
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         return {
             "answer": "X is a formal structure (Course, p.3)",
             "refused": False,
@@ -912,11 +950,13 @@ def test_exercise_then_grade_persist_and_link(client, monkeypatch):
     monkeypatch.setattr("core.retrieval.retrieve", lambda *a, **k: _make_retrieved("Group axioms."))
     monkeypatch.setattr(
         "agent.nodes.generate.get_llm",
-        lambda role="default": _FakeLLM("EXERCISE:\nProve closure.\n\nSOLUTION:\nBy axiom 1."),
+        lambda role="default", api_key=None: _FakeLLM(
+            "EXERCISE:\nProve closure.\n\nSOLUTION:\nBy axiom 1."
+        ),
     )
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 90, "feedback": "Correct."}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 90, "feedback": "Correct."}'),
     )
 
     # 1) Generate an exercise. It must be persisted and its id surfaced.
@@ -962,7 +1002,7 @@ def test_grade_without_exercise_id_is_not_persisted(client, monkeypatch):
     # (persist_grade skips), even though the verdict is still returned.
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 10, "feedback": "No reference."}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 10, "feedback": "No reference."}'),
     )
 
     response = client.post("/grade", json={"student_id": "ivan", "message": "guess"})
@@ -982,7 +1022,9 @@ def test_grade_without_exercise_id_is_not_persisted(client, monkeypatch):
 def test_quiz_returns_questions_without_solutions(client, monkeypatch):
     captured = {}
 
-    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None, language=None):
+    def fake_generate_quiz(
+        notion, n, student_id, *, course=None, chapter=None, language=None, api_key=None
+    ):
         captured["args"] = (notion, n, student_id)
         captured["scope"] = (course, chapter)
         return {
@@ -1026,7 +1068,9 @@ def test_quiz_returns_questions_without_solutions(client, monkeypatch):
 def test_quiz_defaults_question_count(client, monkeypatch):
     captured = {}
 
-    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None, language=None):
+    def fake_generate_quiz(
+        notion, n, student_id, *, course=None, chapter=None, language=None, api_key=None
+    ):
         captured["n"] = n
         return {"quiz_id": 1, "notion": notion, "questions": [], "refused": False}
 
@@ -1040,7 +1084,7 @@ def test_quiz_surfaces_refusal(client, monkeypatch):
     monkeypatch.setattr(
         api_main,
         "generate_quiz",
-        lambda notion, n, student_id, *, course=None, chapter=None, language=None: {
+        lambda notion, n, student_id, *, course=None, chapter=None, language=None, api_key=None: {
             "quiz_id": None,
             "notion": notion,
             "questions": [],
@@ -1060,7 +1104,9 @@ def test_quiz_surfaces_refusal(client, monkeypatch):
 def test_quiz_records_activity_summary_in_history(client, monkeypatch):
     # A generated quiz is recorded as a concise activity turn with the distinct
     # "quiz" role: the notion and question count, never the full quiz JSON.
-    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None, language=None):
+    def fake_generate_quiz(
+        notion, n, student_id, *, course=None, chapter=None, language=None, api_key=None
+    ):
         return {
             "quiz_id": 1,
             "notion": notion,
@@ -1088,7 +1134,9 @@ def test_quiz_rejects_out_of_range_count(client):
 def test_quiz_grade_returns_score_and_feedback(client, monkeypatch):
     captured = {}
 
-    def fake_grade_quiz_answer(quiz_id, question_id, answer, student_id, rigor="standard"):
+    def fake_grade_quiz_answer(
+        quiz_id, question_id, answer, student_id, rigor="standard", api_key=None
+    ):
         captured["args"] = (quiz_id, question_id, answer, student_id, rigor)
         return {"score": 80, "feedback": "Good."}
 
@@ -1107,7 +1155,9 @@ def test_quiz_grade_returns_score_and_feedback(client, monkeypatch):
 def test_quiz_grade_defaults_rigor_to_standard(client, monkeypatch):
     captured = {}
 
-    def fake_grade_quiz_answer(quiz_id, question_id, answer, student_id, rigor="standard"):
+    def fake_grade_quiz_answer(
+        quiz_id, question_id, answer, student_id, rigor="standard", api_key=None
+    ):
         captured["rigor"] = rigor
         return {"score": 80, "feedback": "Good."}
 
@@ -1134,7 +1184,7 @@ def test_quiz_grade_unknown_question_is_404(client, monkeypatch):
     monkeypatch.setattr(
         api_main,
         "grade_quiz_answer",
-        lambda quiz_id, question_id, answer, student_id, rigor="standard": None,
+        lambda quiz_id, question_id, answer, student_id, rigor="standard", api_key=None: None,
     )
 
     response = client.post(
@@ -1154,14 +1204,14 @@ def test_quiz_then_grade_end_to_end(client, monkeypatch):
     monkeypatch.setattr("core.retrieval.retrieve", lambda *a, **k: _make_retrieved("Group axioms."))
     monkeypatch.setattr(
         "agent.nodes.quiz.get_llm",
-        lambda role="default": _FakeLLM(
+        lambda role="default", api_key=None: _FakeLLM(
             '[{"problem": "Prove closure.", "solution": "By axiom 1."},'
             ' {"problem": "Prove identity.", "solution": "Element e."}]'
         ),
     )
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 90, "feedback": "Correct."}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 90, "feedback": "Correct."}'),
     )
 
     quiz_response = client.post("/quiz", json={"student_id": "zed", "notion": "groups", "n": 2})
@@ -1204,7 +1254,7 @@ def test_quiz_then_grade_end_to_end(client, monkeypatch):
 def test_quiz_grade_all_threads_rigor(client, monkeypatch):
     captured = {}
 
-    def fake_summarize_quiz(quiz_id, answers, student_id, rigor="standard"):
+    def fake_summarize_quiz(quiz_id, answers, student_id, rigor="standard", api_key=None):
         captured["args"] = (quiz_id, answers, student_id, rigor)
         return {"total": 70, "results": [], "recommendation": "keep going"}
 
@@ -1228,7 +1278,7 @@ def test_quiz_grade_all_threads_rigor(client, monkeypatch):
 def test_quiz_grade_all_defaults_rigor_to_standard(client, monkeypatch):
     captured = {}
 
-    def fake_summarize_quiz(quiz_id, answers, student_id, rigor="standard"):
+    def fake_summarize_quiz(quiz_id, answers, student_id, rigor="standard", api_key=None):
         captured["rigor"] = rigor
         return {"total": 0, "results": [], "recommendation": ""}
 
@@ -1276,18 +1326,17 @@ def _set_api_key(monkeypatch, key):
 
 def _stub_nodes(monkeypatch):
     """Mock the grounded function and graph nodes so no LLM or network is hit."""
-    monkeypatch.setattr(
-        api_main,
-        "answer",
-        lambda question, *, k=5, course=None, chapter=None, owner=None, language=None: {
-            "answer": "ok",
-            "refused": False,
-            "sources": [],
-            "raw": "ok",
-        },
-    )
 
-    def _fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def _fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
+
+    monkeypatch.setattr(api_main, "answer", _fake_answer)
+
+    def _fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         yield {"type": "sources", "sources": [], "refused": False, "answer": "ok"}
 
     monkeypatch.setattr(api_main, "stream_answer", _fake_stream_answer)
@@ -1312,7 +1361,7 @@ def _stub_nodes(monkeypatch):
     monkeypatch.setattr(
         api_main,
         "generate_quiz",
-        lambda notion, n, student_id, *, course=None, chapter=None, language=None: {
+        lambda notion, n, student_id, *, course=None, chapter=None, language=None, api_key=None: {
             "quiz_id": 1,
             "notion": notion,
             "questions": [{"id": 1, "problem": "Q?"}],
@@ -1322,7 +1371,7 @@ def _stub_nodes(monkeypatch):
     monkeypatch.setattr(
         api_main,
         "grade_quiz_answer",
-        lambda quiz_id, question_id, answer, student_id, rigor="standard": {
+        lambda quiz_id, question_id, answer, student_id, rigor="standard", api_key=None: {
             "score": 50,
             "feedback": "ok",
         },
@@ -1462,11 +1511,13 @@ def _mock_exercise_nodes(monkeypatch):
     monkeypatch.setattr("core.retrieval.retrieve", lambda *a, **k: _make_retrieved("Group axioms."))
     monkeypatch.setattr(
         "agent.nodes.generate.get_llm",
-        lambda role="default": _FakeLLM("EXERCISE:\nProve closure.\n\nSOLUTION:\nBy axiom 1."),
+        lambda role="default", api_key=None: _FakeLLM(
+            "EXERCISE:\nProve closure.\n\nSOLUTION:\nBy axiom 1."
+        ),
     )
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 90, "feedback": "Well argued."}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 90, "feedback": "Well argued."}'),
     )
 
 
@@ -1475,14 +1526,14 @@ def _mock_quiz_nodes(monkeypatch):
     monkeypatch.setattr("core.retrieval.retrieve", lambda *a, **k: _make_retrieved("Group axioms."))
     monkeypatch.setattr(
         "agent.nodes.quiz.get_llm",
-        lambda role="default": _FakeLLM(
+        lambda role="default", api_key=None: _FakeLLM(
             '[{"problem": "Prove closure.", "solution": "By axiom 1."},'
             ' {"problem": "Prove identity.", "solution": "Element e."}]'
         ),
     )
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 80, "feedback": "Mostly right."}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 80, "feedback": "Mostly right."}'),
     )
 
 
@@ -1507,7 +1558,9 @@ def test_quiz_activity_carries_ref_id_in_history(client, monkeypatch):
 
 def test_plain_qa_history_has_null_ref_id(client, monkeypatch):
     # A plain question/answer turn is not an activity item: ref_id stays null.
-    def fake_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         return {"answer": "a", "refused": False, "sources": [], "raw": "a"}
 
     monkeypatch.setattr(api_main, "answer", fake_answer)
@@ -1728,3 +1781,175 @@ def test_upload_threads_openai_key_but_never_stores_it(client, monkeypatch, tmp_
     assert "sk-visitor" not in str(job)
     assert "openai_key" not in job
     assert "api_key" not in job
+
+
+# --- X-OpenAI-Key: visitor's own key replaces the free model everywhere ------
+
+
+def test_ask_threads_openai_key_header_into_answer(client, monkeypatch):
+    # When the request carries an X-OpenAI-Key header, the key is threaded into
+    # the grounded answer call (which forwards it to get_llm) so the visitor's own
+    # premium OpenAI model replaces the free default. It never appears in the body.
+    captured = {}
+
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        captured["api_key"] = api_key
+        return {
+            "answer": "A wavelet is ... (Course, p.11)",
+            "refused": False,
+            "sources": ["(Course, p.11)"],
+            "citations": [],
+            "raw": "A wavelet is ... [1]",
+        }
+
+    monkeypatch.setattr(api_main, "answer", fake_answer)
+
+    response = client.post(
+        "/ask",
+        json={"student_id": "s1", "question": "What is a wavelet?"},
+        headers={"X-OpenAI-Key": "sk-visitor"},
+    )
+    assert response.status_code == 200
+    assert captured["api_key"] == "sk-visitor"
+    # The key is never echoed back to the client.
+    assert "sk-visitor" not in response.text
+
+
+def test_ask_without_key_header_keeps_free_path(client, monkeypatch):
+    # With no header the core call receives api_key=None, so the free model is used
+    # exactly as before (byte-identical default behaviour).
+    captured = {}
+
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        captured["api_key"] = api_key
+        return {
+            "answer": "ok (Course, p.1)",
+            "refused": False,
+            "sources": [],
+            "citations": [],
+            "raw": "ok",
+        }
+
+    monkeypatch.setattr(api_main, "answer", fake_answer)
+
+    response = client.post("/ask", json={"student_id": "s1", "question": "q?"})
+    assert response.status_code == 200
+    assert captured["api_key"] is None
+
+
+def test_ask_blank_key_header_normalizes_to_none(client, monkeypatch):
+    # A whitespace-only header is treated as absent, so it never forwards an empty
+    # credential that would break the OpenAI client.
+    captured = {}
+
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        captured["api_key"] = api_key
+        return {
+            "answer": "ok (Course, p.1)",
+            "refused": False,
+            "sources": [],
+            "citations": [],
+            "raw": "ok",
+        }
+
+    monkeypatch.setattr(api_main, "answer", fake_answer)
+
+    response = client.post(
+        "/ask", json={"student_id": "s1", "question": "q?"}, headers={"X-OpenAI-Key": "   "}
+    )
+    assert response.status_code == 200
+    assert captured["api_key"] is None
+
+
+def test_exercise_threads_openai_key_into_generate_state(client, monkeypatch):
+    # The exercise node reads its per-request key from the graph state; the endpoint
+    # must place the header value there and never leak it into the response.
+    captured = {}
+
+    def fake_generate(state):
+        captured["api_key"] = state.get("api_key")
+        return {
+            "exercise": {"problem": "Compute X.", "solution": "X=42.", "refused": False},
+            "retrieved": [],
+        }
+
+    monkeypatch.setattr(api_main, "generate", fake_generate)
+
+    response = client.post(
+        "/exercise",
+        json={"student_id": "s1", "notion": "integrals"},
+        headers={"X-OpenAI-Key": "sk-visitor"},
+    )
+    assert response.status_code == 200
+    assert captured["api_key"] == "sk-visitor"
+    assert "sk-visitor" not in response.text
+
+
+def test_ask_async_never_stores_openai_key_in_job_record(client, monkeypatch):
+    # The async answer path threads the key into stream_answer but the polled job
+    # record must carry no trace of it (never persisted, never returned).
+    captured = {}
+
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        captured["api_key"] = api_key
+        yield {"type": "token", "text": "A wavelet is X [1]."}
+        yield {
+            "type": "sources",
+            "sources": ["(Course, p.11)"],
+            "citations": [],
+            "refused": False,
+            "answer": "A wavelet is X [1].",
+        }
+
+    monkeypatch.setattr(api_main, "stream_answer", fake_stream_answer)
+
+    response = client.post(
+        "/ask/async",
+        json={"student_id": "s1", "question": "What is a wavelet?"},
+        headers={"X-OpenAI-Key": "sk-visitor"},
+    )
+    assert response.status_code == 202
+    job_id = response.json()["job_id"]
+    job = _wait_for_ask_job(client, job_id, "s1")
+    assert captured["api_key"] == "sk-visitor"
+    # The key never lands in the job record surfaced to the client.
+    assert "sk-visitor" not in str(job)
+    assert "api_key" not in job
+
+
+def test_upload_header_openai_key_wins_over_form_field(client, monkeypatch, tmp_path):
+    # The X-OpenAI-Key header takes precedence over the legacy openai_key form
+    # field so the global key set in the UI flows through automatically.
+    import threading
+
+    stored = tmp_path / "scan.pdf"
+    stored.write_bytes(b"%PDF")
+    seen: dict[str, object] = {}
+    ingested = threading.Event()
+
+    def fake_stream_ingest(path, course, chapter, *, owner=None, extract_api_key=None):
+        seen["extract_api_key"] = extract_api_key
+        ingested.set()
+        yield {"type": "done", "indexed": 1}
+
+    monkeypatch.setattr(api_main, "save_upload", lambda *_a, **_k: str(stored))
+    monkeypatch.setattr(api_main, "stream_ingest", fake_stream_ingest)
+
+    response = client.post(
+        "/documents/upload",
+        data={"course": "Wavelets", "student_id": "s1", "openai_key": "sk-form"},
+        files={"file": ("scan.pdf", b"%PDF", "application/pdf")},
+        headers={"X-OpenAI-Key": "sk-header"},
+    )
+    assert response.status_code == 202
+    assert ingested.wait(timeout=5.0)
+    assert seen["extract_api_key"] == "sk-header"
+    assert "sk-header" not in response.text

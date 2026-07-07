@@ -331,10 +331,25 @@ def _is_openai_model(model: str) -> bool:
     `init_chat_model` accepts an optional `provider:model` prefix. A model routed
     to Ollama or Groq carries an explicit `ollama:`/`groq:` prefix, so anything
     without one (the bare `gpt-4o-mini` default, an explicit `openai:...`, etc.)
-    is served by OpenAI. This is exactly the vision `extract` fallback under the
-    Groq provider, which is the only place a caller's own key is forwarded.
+    is served by OpenAI.
     """
     return not (model.startswith("ollama:") or model.startswith("groq:"))
+
+
+def _resolve_openai_model(role: str) -> str:
+    """Resolve the OpenAI model id for a role when a caller supplies their own key.
+
+    A visitor's own OpenAI key overrides the global provider for this one call, so
+    the role must resolve to an OpenAI model regardless of `LLM_PROVIDER`. An
+    explicit `LLM_<ROLE>` override is honoured only when it names an OpenAI model
+    (a bare id or an `openai:` prefix); an Ollama/Groq-prefixed override is ignored
+    in favour of the OpenAI default `gpt-4o-mini`, since the caller's key
+    authenticates OpenAI and could not talk to those providers.
+    """
+    override = os.getenv(f"LLM_{role.upper()}")
+    if override and _is_openai_model(override):
+        return override
+    return "gpt-4o-mini"
 
 
 def get_llm(role: str = "default", api_key: str | None = None):
@@ -346,14 +361,18 @@ def get_llm(role: str = "default", api_key: str | None = None):
     non-vision roles to a free-tier Groq-hosted model. Uses `temperature=0` for
     reproducibility.
 
-    `api_key` is an optional per-call OpenAI key: when given AND the resolved
-    model is an OpenAI one, it authenticates this model instead of the process
-    `OPENAI_API_KEY`. It is used only to let a visitor pay for their own scanned-
-    PDF ingestion (the vision `extract` fallback), so the app owner is never
-    billed. The key is passed straight into `init_chat_model` and lives only on
-    the returned model instance for the duration of this call; it is never cached
-    globally, stored or logged. For a non-OpenAI resolved model the override is
-    ignored, so it can never break the Groq/Ollama paths.
+    `api_key` is an optional per-call OpenAI key. When it is a non-empty string it
+    switches THIS call to OpenAI regardless of the global provider: the role
+    resolves to its OpenAI model (the `LLM_<ROLE>` value when that names an OpenAI
+    model, else the OpenAI default `gpt-4o-mini`) and the key authenticates the
+    model instead of the process `OPENAI_API_KEY`. This lets a visitor use — and
+    pay for — a premium OpenAI model everywhere (Ask, exercises, quizzes, grading,
+    the router, PDF extraction) while the free Groq/Ollama models remain the
+    default when no key is supplied. The key is passed straight into
+    `init_chat_model` and lives only on the returned model instance for the
+    duration of this call; it is never cached globally, stored or logged. When
+    `api_key` is None/empty the resolution is unchanged (Groq/Ollama/OpenAI per
+    env), so the free path is byte-identical.
     """
     # Configure the global LLM cache once (no-op unless `llm_cache` is set), so
     # repeated identical prompts are served from cache instead of re-billed. The
@@ -361,12 +380,15 @@ def get_llm(role: str = "default", api_key: str | None = None):
     # per-request key is never persisted across callers.
     configure_cache()
 
-    model, provider_kwargs = _resolve_model(role)
-    # Forward the caller's key only for an OpenAI model; ignore it otherwise so
-    # Groq/Ollama are untouched. `init_chat_model` maps `api_key` to the provider
-    # SDK's credential (ChatOpenAI's `openai_api_key`).
-    if api_key and _is_openai_model(model):
-        provider_kwargs = {**provider_kwargs, "api_key": api_key}
+    if api_key:
+        # A caller's own key overrides the global provider for this call: resolve
+        # to the role's OpenAI model and authenticate it with that key. The key is
+        # mapped by `init_chat_model` to the provider SDK's credential (ChatOpenAI's
+        # `openai_api_key`) and never leaves the returned instance.
+        model = _resolve_openai_model(role)
+        provider_kwargs: dict = {"api_key": api_key}
+    else:
+        model, provider_kwargs = _resolve_model(role)
     llm = init_chat_model(model, temperature=0, **provider_kwargs)
 
     # Compose callbacks: LangFuse tracing (opt-in) and the token budget guard

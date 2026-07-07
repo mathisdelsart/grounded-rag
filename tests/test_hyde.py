@@ -27,7 +27,9 @@ def _fake_llm(content):
 
 
 def _patch_llm(monkeypatch, content):
-    monkeypatch.setattr(query_mod, "get_llm", lambda role="default": _fake_llm(content))
+    monkeypatch.setattr(
+        query_mod, "get_llm", lambda role="default", api_key=None: _fake_llm(content)
+    )
 
 
 def test_hyde_passage_returns_llm_passage(monkeypatch):
@@ -37,7 +39,7 @@ def test_hyde_passage_returns_llm_passage(monkeypatch):
 
 
 def test_hyde_passage_falls_back_when_llm_raises(monkeypatch):
-    def _raising_llm(role="default"):
+    def _raising_llm(role="default", api_key=None):
         class _LLM:
             def invoke(self, messages, config=None):
                 raise RuntimeError("provider down")
@@ -131,7 +133,7 @@ def _patch_retrieval_env(monkeypatch):
 def test_retrieve_hyde_embeds_the_hypothetical_passage(monkeypatch):
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch)
-    monkeypatch.setattr(retrieval, "hyde_passage", lambda q: "HYPOTHETICAL ANSWER")
+    monkeypatch.setattr(retrieval, "hyde_passage", lambda q, api_key=None: "HYPOTHETICAL ANSWER")
     # Only the hypothetical passage routes to a candidate; the bare question does not.
     _FakeQdrantClient.by_query = {"HYPOTHETICAL ANSWER": [_point("p1", 0.9, "alpha")]}
 
@@ -161,7 +163,7 @@ def test_retrieve_hyde_refuses_when_nothing_clears_threshold(monkeypatch):
     # the result is empty -> the answer layer refuses. Refusal preserved.
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch)
-    monkeypatch.setattr(retrieval, "hyde_passage", lambda q: "off-topic hypothetical")
+    monkeypatch.setattr(retrieval, "hyde_passage", lambda q, api_key=None: "off-topic hypothetical")
     _FakeQdrantClient.by_query = {}
     assert retrieval.retrieve("off-topic", hyde=True) == []
     # The configured similarity threshold was still passed through.
@@ -174,7 +176,7 @@ def test_retrieve_hyde_falls_back_to_question_on_llm_failure(monkeypatch):
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch)
 
-    def _raising_llm(role="default"):
+    def _raising_llm(role="default", api_key=None):
         class _LLM:
             def invoke(self, messages, config=None):
                 raise RuntimeError("provider down")
@@ -192,7 +194,7 @@ def test_retrieve_hyde_falls_back_to_question_on_llm_failure(monkeypatch):
 def test_retrieve_hyde_composes_with_reranker(monkeypatch):
     _patch_retrieval_env(monkeypatch)
     _settings(monkeypatch, reranker_model="fake-model", rerank_candidates=20)
-    monkeypatch.setattr(retrieval, "hyde_passage", lambda q: "HYPO")
+    monkeypatch.setattr(retrieval, "hyde_passage", lambda q, api_key=None: "HYPO")
     _FakeQdrantClient.by_query = {
         "HYPO": [_point("p1", 0.91, "alpha"), _point("p2", 0.80, "bravo")],
     }
@@ -218,7 +220,7 @@ def test_retrieve_hyde_uses_hypothetical_for_dense_question_for_sparse(monkeypat
     _patch_retrieval_env(monkeypatch)
     _FakeQdrantClient.has_sparse = True
     _settings(monkeypatch, hybrid_retrieval=True)
-    monkeypatch.setattr(retrieval, "hyde_passage", lambda q: "HYPO")
+    monkeypatch.setattr(retrieval, "hyde_passage", lambda q, api_key=None: "HYPO")
 
     embedded = {}
 
@@ -248,12 +250,12 @@ def test_retrieve_hyde_uses_hypothetical_for_dense_question_for_sparse(monkeypat
 def test_answer_uses_hyde_when_enabled(monkeypatch):
     called = {"single": 0, "multi": 0, "hyde_flag": None}
 
-    def fake_retrieve(q, *, k=5, course=None, chapter=None, owner=None, hyde=False):
+    def fake_retrieve(q, *, k=5, course=None, chapter=None, owner=None, hyde=False, api_key=None):
         called["single"] += 1
         called["hyde_flag"] = hyde
         return []
 
-    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None):
+    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None, api_key=None):
         called["multi"] += 1
         return []
 
@@ -273,11 +275,11 @@ def test_answer_uses_hyde_when_enabled(monkeypatch):
 def test_answer_multi_query_takes_precedence_over_hyde(monkeypatch):
     called = {"single": 0, "multi": 0}
 
-    def fake_retrieve(q, *, k=5, course=None, chapter=None, owner=None, hyde=False):
+    def fake_retrieve(q, *, k=5, course=None, chapter=None, owner=None, hyde=False, api_key=None):
         called["single"] += 1
         return []
 
-    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None):
+    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None, api_key=None):
         called["multi"] += 1
         return []
 
@@ -297,12 +299,12 @@ def test_answer_multi_query_takes_precedence_over_hyde(monkeypatch):
 def test_answer_default_off_uses_plain_single_query(monkeypatch):
     called = {"single": 0, "multi": 0, "hyde_flag": None}
 
-    def fake_retrieve(q, *, k=5, course=None, chapter=None, owner=None, hyde=False):
+    def fake_retrieve(q, *, k=5, course=None, chapter=None, owner=None, hyde=False, api_key=None):
         called["single"] += 1
         called["hyde_flag"] = hyde
         return []
 
-    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None):
+    def fake_multi(q, *, k=5, course=None, chapter=None, owner=None, api_key=None):
         called["multi"] += 1
         return []
 

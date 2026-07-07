@@ -151,7 +151,7 @@ def grade(state: TutorState) -> TutorState:
         f"{guidance}"
     )
     raw = (
-        get_llm("grade")
+        get_llm("grade", api_key=state.get("api_key"))
         .invoke(
             [("system", _SYSTEM), ("human", human)],
             config={"callbacks": get_callbacks()},

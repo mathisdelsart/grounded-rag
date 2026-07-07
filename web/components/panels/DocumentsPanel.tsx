@@ -19,7 +19,6 @@ import { TextField, FieldShell, baseField } from "@/components/TextField";
 import { EmptyState, Skeleton } from "@/components/States";
 import { useToast } from "@/components/Toast";
 import { useT } from "@/lib/i18n";
-import { KEYS, readLocal, writeLocal } from "@/lib/storage";
 import { cn } from "@/lib/cn";
 
 interface DocumentsPanelProps {
@@ -31,6 +30,15 @@ interface DocumentsPanelProps {
    * without a manual page refresh.
    */
   onCoursesChanged?: () => void;
+  /**
+   * The visitor's own OpenAI key, lifted to the page so it stays in sync with
+   * the account-menu setting (both persist to the same storage key). When set it
+   * is sent on every request (including this upload) so LLM calls use the
+   * visitor's own premium model instead of the free one.
+   */
+  openaiKey: string;
+  /** Persist a new OpenAI key value (writes localStorage in the parent). */
+  onOpenaiKeyChange: (value: string) => void;
 }
 
 function rowKey(course: string, chapter: string | null): string {
@@ -76,7 +84,13 @@ function fmtTime(seconds: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export function DocumentsPanel({ studentId, config, onCoursesChanged }: DocumentsPanelProps) {
+export function DocumentsPanel({
+  studentId,
+  config,
+  onCoursesChanged,
+  openaiKey,
+  onOpenaiKeyChange,
+}: DocumentsPanelProps) {
   const toast = useToast();
   const { t } = useT();
   const openaiKeyId = useId();
@@ -85,9 +99,8 @@ export function DocumentsPanel({ studentId, config, onCoursesChanged }: Document
   const [file, setFile] = useState<File | null>(null);
   const [course, setCourse] = useState("");
   const [chapter, setChapter] = useState("");
-  // The visitor's own OpenAI key, used ONLY to import scanned/image PDFs. Kept in
-  // the browser (localStorage) and sent only with the upload; hidden by default.
-  const [openaiKey, setOpenaiKey] = useState("");
+  // The OpenAI key is lifted to the page (props) so it stays in sync with the
+  // account-menu setting; only the show/hide toggle is local here.
   const [showKey, setShowKey] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   // Row currently awaiting an explicit red confirmation before deletion.
@@ -140,8 +153,6 @@ export function DocumentsPanel({ studentId, config, onCoursesChanged }: Document
     // (started before a refresh/navigation). The polling effect takes over.
     const resumed = loadActiveJob();
     if (resumed) setActiveJob(resumed);
-    // Restore the visitor's own OpenAI key from the browser (never from the server).
-    setOpenaiKey(readLocal(KEYS.openaiKey));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -424,10 +435,7 @@ export function DocumentsPanel({ studentId, config, onCoursesChanged }: Document
                   placeholder="sk-…"
                   value={openaiKey}
                   disabled={uploading}
-                  onChange={(e) => {
-                    setOpenaiKey(e.target.value);
-                    writeLocal(KEYS.openaiKey, e.target.value.trim());
-                  }}
+                  onChange={(e) => onOpenaiKeyChange(e.target.value)}
                   className={cn(baseField, "pr-11")}
                 />
                 <button

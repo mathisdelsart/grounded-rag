@@ -131,7 +131,7 @@ def test_answer_threads_callbacks(monkeypatch, callbacks):
     results = [Retrieved(chunk=Chunk(id="1", course="C", page=1, text="t"), score=0.9)]
     monkeypatch.setattr(answer_mod, "retrieve", lambda *a, **k: results)
     llm = _CapturingLLM("grounded [1].")
-    monkeypatch.setattr(answer_mod, "get_llm", lambda role: llm)
+    monkeypatch.setattr(answer_mod, "get_llm", lambda role, api_key=None: llm)
     _patch_callbacks(monkeypatch, answer_mod, callbacks)
 
     answer_mod.answer("q")
@@ -146,7 +146,7 @@ def test_stream_answer_threads_callbacks(monkeypatch, callbacks):
     results = [Retrieved(chunk=Chunk(id="1", course="C", page=1, text="t"), score=0.9)]
     monkeypatch.setattr(answer_mod, "retrieve", lambda *a, **k: results)
     llm = _CapturingLLM("grounded [1].")
-    monkeypatch.setattr(answer_mod, "get_llm", lambda role: llm)
+    monkeypatch.setattr(answer_mod, "get_llm", lambda role, api_key=None: llm)
     _patch_callbacks(monkeypatch, answer_mod, callbacks)
 
     list(answer_mod.stream_answer("q"))
@@ -158,7 +158,7 @@ def test_router_threads_callbacks(monkeypatch, callbacks):
     import agent.graph as graph_mod
 
     llm = _CapturingLLM("explain")
-    monkeypatch.setattr(graph_mod, "get_llm", lambda role="default": llm)
+    monkeypatch.setattr(graph_mod, "get_llm", lambda role="default", api_key=None: llm)
     _patch_callbacks(monkeypatch, graph_mod, callbacks)
 
     graph_mod.classify_intent("what is x?")
@@ -175,7 +175,7 @@ def test_generate_threads_callbacks(monkeypatch, callbacks):
     monkeypatch.setattr(retrieval_mod, "retrieve", lambda *a, **k: results)
     monkeypatch.setattr(gen_mod, "persist_exercise", lambda *a, **k: None)
     llm = _CapturingLLM("EXERCISE:\nE\n\nSOLUTION:\nS")
-    monkeypatch.setattr(gen_mod, "get_llm", lambda role="default": llm)
+    monkeypatch.setattr(gen_mod, "get_llm", lambda role="default", api_key=None: llm)
     _patch_callbacks(monkeypatch, gen_mod, callbacks)
 
     gen_mod.generate({"message": "notion"})
@@ -188,7 +188,7 @@ def test_grade_threads_callbacks(monkeypatch, callbacks):
 
     monkeypatch.setattr(grade_mod, "persist_grade", lambda *a, **k: None)
     llm = _CapturingLLM('{"score": 80, "feedback": "ok"}')
-    monkeypatch.setattr(grade_mod, "get_llm", lambda role="default": llm)
+    monkeypatch.setattr(grade_mod, "get_llm", lambda role="default", api_key=None: llm)
     _patch_callbacks(monkeypatch, grade_mod, callbacks)
 
     grade_mod.grade({"message": "ans", "exercise": {"solution": "ref"}})
@@ -200,7 +200,7 @@ def test_reexplain_threads_callbacks(monkeypatch, callbacks):
     import agent.nodes.reexplain as re_mod
 
     llm = _CapturingLLM("simpler version")
-    monkeypatch.setattr(re_mod, "get_llm", lambda role="default": llm)
+    monkeypatch.setattr(re_mod, "get_llm", lambda role="default", api_key=None: llm)
     _patch_callbacks(monkeypatch, re_mod, callbacks)
 
     re_mod.reexplain({"message": "again", "answer": "previous"})
@@ -214,7 +214,7 @@ def test_eval_judge_threads_callbacks(monkeypatch, callbacks):
     from eval.run_eval import _default_judge_fn
 
     llm = _CapturingLLM('{"faithful": true, "relevant": true}')
-    monkeypatch.setattr(cfg, "get_llm", lambda role="default": llm)
+    monkeypatch.setattr(cfg, "get_llm", lambda role="default", api_key=None: llm)
     monkeypatch.setattr(obs_mod, "get_callbacks", lambda: callbacks)
 
     judge = _default_judge_fn()

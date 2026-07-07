@@ -45,7 +45,7 @@ def test_answer_includes_retrieved_chunk_texts(monkeypatch):
     monkeypatch.setattr(answer_mod, "retrieve", lambda *a, **k: results)
     reply = SimpleNamespace(content="A wavelet is X [1].")
     fake_llm = SimpleNamespace(invoke=lambda messages, config=None: reply)
-    monkeypatch.setattr(answer_mod, "get_llm", lambda role: fake_llm)
+    monkeypatch.setattr(answer_mod, "get_llm", lambda role, api_key=None: fake_llm)
 
     out = answer_mod.answer("what is a wavelet?")
 
@@ -73,7 +73,7 @@ def test_answer_strips_trailing_refusal_appended_after_real_answer(monkeypatch):
     monkeypatch.setattr(
         answer_mod,
         "get_llm",
-        lambda role: SimpleNamespace(invoke=lambda messages, config=None: reply),
+        lambda role, api_key=None: SimpleNamespace(invoke=lambda messages, config=None: reply),
     )
 
     out = answer_mod.answer("what is a wavelet?")
@@ -104,7 +104,7 @@ def test_answer_strips_filler_lead_in_line(monkeypatch):
     monkeypatch.setattr(
         answer_mod,
         "get_llm",
-        lambda role: SimpleNamespace(invoke=lambda messages, config=None: reply),
+        lambda role, api_key=None: SimpleNamespace(invoke=lambda messages, config=None: reply),
     )
 
     out = answer_mod.answer("what is a wavelet?")
@@ -121,7 +121,7 @@ def test_answer_refuses_when_whole_output_is_refusal(monkeypatch):
     monkeypatch.setattr(
         answer_mod,
         "get_llm",
-        lambda role: SimpleNamespace(invoke=lambda messages, config=None: reply),
+        lambda role, api_key=None: SimpleNamespace(invoke=lambda messages, config=None: reply),
     )
 
     out = answer_mod.answer("uncovered topic")
@@ -140,7 +140,7 @@ def test_answer_refuses_when_model_answers_without_any_citation(monkeypatch):
     monkeypatch.setattr(
         answer_mod,
         "get_llm",
-        lambda role: SimpleNamespace(invoke=lambda messages, config=None: reply),
+        lambda role, api_key=None: SimpleNamespace(invoke=lambda messages, config=None: reply),
     )
 
     out = answer_mod.answer("what is the wavelet transform?")
@@ -160,7 +160,7 @@ def test_answer_keeps_grounded_answer_with_citation(monkeypatch):
     monkeypatch.setattr(
         answer_mod,
         "get_llm",
-        lambda role: SimpleNamespace(invoke=lambda messages, config=None: reply),
+        lambda role, api_key=None: SimpleNamespace(invoke=lambda messages, config=None: reply),
     )
 
     out = answer_mod.answer("what is a wavelet?")
@@ -178,7 +178,9 @@ def test_stream_answer_refuses_when_no_citation(monkeypatch):
     monkeypatch.setattr(
         answer_mod,
         "get_llm",
-        lambda role: _fake_stream_llm(["The Wavelet Transform ", "decomposes a signal."]),
+        lambda role, api_key=None: _fake_stream_llm(
+            ["The Wavelet Transform ", "decomposes a signal."]
+        ),
     )
 
     events = list(answer_mod.stream_answer("what is the wavelet transform?"))
@@ -201,7 +203,9 @@ def test_answer_language_injects_french_instruction(monkeypatch):
         captured.append(messages)
         return SimpleNamespace(content="Une ondelette est localisée [1].")
 
-    monkeypatch.setattr(answer_mod, "get_llm", lambda role: SimpleNamespace(invoke=_invoke))
+    monkeypatch.setattr(
+        answer_mod, "get_llm", lambda role, api_key=None: SimpleNamespace(invoke=_invoke)
+    )
 
     answer_mod.answer("qu'est-ce qu'une ondelette ?", language="fr")
 
@@ -217,7 +221,9 @@ def test_stream_answer_strips_trailing_refusal(monkeypatch):
     monkeypatch.setattr(
         answer_mod,
         "get_llm",
-        lambda role: _fake_stream_llm(["A wavelet is X [1].\n\n", answer_mod.REFUSAL]),
+        lambda role, api_key=None: _fake_stream_llm(
+            ["A wavelet is X [1].\n\n", answer_mod.REFUSAL]
+        ),
     )
 
     events = list(answer_mod.stream_answer("what is a wavelet?"))
@@ -252,7 +258,9 @@ def test_stream_answer_yields_tokens_then_sources(monkeypatch):
     results = [_retrieved(11, text="A wavelet is localized.")]
     monkeypatch.setattr(answer_mod, "retrieve", lambda *a, **k: results)
     monkeypatch.setattr(
-        answer_mod, "get_llm", lambda role: _fake_stream_llm(["A wavelet ", "is X ", "[1]."])
+        answer_mod,
+        "get_llm",
+        lambda role, api_key=None: _fake_stream_llm(["A wavelet ", "is X ", "[1]."]),
     )
 
     events = list(answer_mod.stream_answer("what is a wavelet?"))
@@ -286,7 +294,9 @@ def test_stream_answer_refuses_when_no_retrieval(monkeypatch):
 def test_stream_answer_refuses_when_model_emits_refusal(monkeypatch):
     results = [_retrieved(11)]
     monkeypatch.setattr(answer_mod, "retrieve", lambda *a, **k: results)
-    monkeypatch.setattr(answer_mod, "get_llm", lambda role: _fake_stream_llm([answer_mod.REFUSAL]))
+    monkeypatch.setattr(
+        answer_mod, "get_llm", lambda role, api_key=None: _fake_stream_llm([answer_mod.REFUSAL])
+    )
 
     events = list(answer_mod.stream_answer("uncovered"))
     final = events[-1]

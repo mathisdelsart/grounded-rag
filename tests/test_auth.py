@@ -229,16 +229,12 @@ def test_me_token_for_deleted_user_is_401(client):
 def test_existing_endpoints_do_not_require_bearer(client, monkeypatch):
     # The tutor endpoints stay open to the bearer guard: no Authorization header
     # is needed (only the optional X-API-Key guard applies, here disabled).
-    monkeypatch.setattr(
-        api_main,
-        "answer",
-        lambda question, *, k=5, course=None, chapter=None, owner=None, language=None: {
-            "answer": "ok",
-            "refused": False,
-            "sources": [],
-            "raw": "ok",
-        },
-    )
+    def _fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
+
+    monkeypatch.setattr(api_main, "answer", _fake_answer)
     response = client.post("/ask", json={"student_id": "s1", "question": "q"})
     assert response.status_code == 200
 

@@ -63,16 +63,13 @@ def _set_settings(monkeypatch, **overrides):
 
 def _stub_answer(monkeypatch):
     """Mock the grounded function so /ask never hits an LLM or the network."""
-    monkeypatch.setattr(
-        api_main,
-        "answer",
-        lambda question, *, k=5, course=None, chapter=None, owner=None, language=None: {
-            "answer": "ok",
-            "refused": False,
-            "sources": [],
-            "raw": "ok",
-        },
-    )
+
+    def _fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
+
+    monkeypatch.setattr(api_main, "answer", _fake_answer)
 
 
 # --- Security headers --------------------------------------------------------
