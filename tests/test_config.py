@@ -187,3 +187,30 @@ def test_get_llm_ollama_builds_local_model(monkeypatch):
     assert captured["model"] == "ollama:llama3.1"
     assert captured["kwargs"].get("base_url") == "http://ollama.internal:11434"
     assert captured["kwargs"].get("temperature") == 0
+
+
+# --- Effective rate limit ----------------------------------------------------
+
+
+def test_effective_rate_limit_auto_off_in_local_dev():
+    # Auto (0) + require_auth False (local dev): stays off.
+    settings = config.Settings(rate_limit_per_minute=0, require_auth=False)
+    assert settings.effective_rate_limit_per_minute == 0
+
+
+def test_effective_rate_limit_auto_defaults_to_60_in_public_mode():
+    # Auto (0) + require_auth True (public mode): sane default throttle.
+    settings = config.Settings(rate_limit_per_minute=0, require_auth=True)
+    assert settings.effective_rate_limit_per_minute == 60
+
+
+def test_effective_rate_limit_explicit_override_wins_regardless_of_auth():
+    # An explicit positive value always wins over the auto default, in both modes.
+    local = config.Settings(rate_limit_per_minute=30, require_auth=False)
+    public = config.Settings(rate_limit_per_minute=30, require_auth=True)
+    assert local.effective_rate_limit_per_minute == 30
+    assert public.effective_rate_limit_per_minute == 30
+
+
+def test_max_upload_mb_default():
+    assert config.Settings().max_upload_mb == 25

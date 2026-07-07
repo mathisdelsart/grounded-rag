@@ -136,6 +136,22 @@ def test_rate_limit_health_is_also_counted(client, monkeypatch):
     assert client.get("/health").status_code == 429
 
 
+def test_public_mode_auto_enables_default_throttle(client, monkeypatch):
+    # Public mode (require_auth) with the auto default (rate_limit_per_minute=0)
+    # resolves to a 60/min throttle: the 61st request in the window is rejected.
+    _set_settings(monkeypatch, require_auth=True, rate_limit_per_minute=0)
+    for _ in range(60):
+        assert client.get("/health").status_code == 200
+    assert client.get("/health").status_code == 429
+
+
+def test_middleware_reads_effective_limit(monkeypatch):
+    # The middleware must read the effective (auto-derived) limit, not the raw
+    # field, so public mode is throttled even when rate_limit_per_minute is 0.
+    _set_settings(monkeypatch, require_auth=True, rate_limit_per_minute=0)
+    assert api_middleware.get_settings().effective_rate_limit_per_minute == 60
+
+
 # --- Counter unit behavior ---------------------------------------------------
 
 

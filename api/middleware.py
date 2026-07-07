@@ -4,9 +4,11 @@ Both pieces are pure-stdlib (no third-party dependency) and safe by default:
 
 * Security headers are always added and never change response bodies or status
   codes, so existing behavior is preserved.
-* Rate limiting is disabled unless ``Settings.rate_limit_per_minute`` is a
-  positive value, so the default configuration (and the test suite) is never
-  throttled.
+* Rate limiting reads ``Settings.effective_rate_limit_per_minute``, which is 0
+  (off) for local dev and auto-defaults to 60/min once public auth
+  (``require_auth``) is enabled, so turning on public mode also turns on a
+  default throttle. The local default configuration (and the test suite) is
+  never throttled; an explicit positive ``rate_limit_per_minute`` always wins.
 
 The middleware reads settings through ``core.config.get_settings`` at request
 time, so a deployment toggles either feature with an environment variable and no
@@ -140,11 +142,14 @@ class _FixedWindowCounter:
 
 
 class RateLimitMiddleware:
-    """Throttle each client IP to ``rate_limit_per_minute`` requests per minute.
+    """Throttle each client IP to the effective rate limit (requests per minute).
 
-    Disabled (pass-through) when the configured limit is not positive, which is
-    the default. When enabled and the limit is exceeded, the request is rejected
-    with HTTP 429 and a ``Retry-After`` header, without invoking the route.
+    The limit is read from ``Settings.effective_rate_limit_per_minute``: 0 (off)
+    for local dev, an auto-default of 60/min once public auth (``require_auth``)
+    is enabled, or an explicit operator override. Disabled (pass-through) when
+    the effective limit is not positive. When enabled and the limit is exceeded,
+    the request is rejected with HTTP 429 and a ``Retry-After`` header, without
+    invoking the route.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -156,7 +161,7 @@ class RateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        limit = get_settings().rate_limit_per_minute
+        limit = get_settings().effective_rate_limit_per_minute
         if limit <= 0:
             await self.app(scope, receive, send)
             return

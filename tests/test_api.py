@@ -1603,3 +1603,62 @@ def test_quiz_review_foreign_student_is_404(client, monkeypatch):
     quiz = client.post("/quiz", json={"student_id": "ownerq", "notion": "groups", "n": 2}).json()
     resp = client.get(f"/quiz/{quiz['quiz_id']}/review", params={"student_id": "strangerq"})
     assert resp.status_code == 404
+
+
+# --- Upload size guard -------------------------------------------------------
+
+
+def test_upload_rejects_file_larger_than_limit(client, monkeypatch):
+    # A payload above max_upload_mb is rejected with 413 before any ingestion.
+    from core.config import Settings
+
+    monkeypatch.setattr(api_main, "get_settings", lambda: Settings(max_upload_mb=1))
+
+    def boom_save(*_args, **_kwargs):  # pragma: no cover - must never run
+        raise AssertionError("oversized upload must be rejected before saving")
+
+    monkeypatch.setattr(api_main, "save_upload", boom_save)
+
+    oversized = b"x" * (1 * 1024 * 1024 + 1)
+    response = client.post(
+        "/documents/upload",
+        data={"course": "Wavelets", "student_id": "s1"},
+        files={"file": ("big.md", oversized, "text/markdown")},
+    )
+    assert response.status_code == 413
+    assert "too large" in response.json()["detail"].lower()
+
+
+def test_upload_small_file_is_accepted_and_ingested(client, monkeypatch, tmp_path):
+    # A small upload passes the guard, is saved, and drives ingestion (mocked so
+    # no real Qdrant/LLM call happens).
+    import threading
+
+    saved = {}
+    stored = tmp_path / "doc.md"
+    stored.write_text("hello")
+
+    def fake_save(contents, course, filename):
+        saved["bytes"] = len(contents)
+        saved["course"] = course
+        return str(stored)
+
+    ingested = threading.Event()
+
+    def fake_stream_ingest(path, course, chapter, *, owner=None):
+        ingested.set()
+        yield {"type": "done", "indexed": 1}
+
+    monkeypatch.setattr(api_main, "save_upload", fake_save)
+    monkeypatch.setattr(api_main, "stream_ingest", fake_stream_ingest)
+
+    response = client.post(
+        "/documents/upload",
+        data={"course": "Wavelets", "student_id": "s1"},
+        files={"file": ("doc.md", b"hello", "text/markdown")},
+    )
+    assert response.status_code == 202
+    assert "job_id" in response.json()
+    assert saved["bytes"] == len(b"hello")
+    # The background ingest thread was reached with the mocked generator.
+    assert ingested.wait(timeout=5.0)

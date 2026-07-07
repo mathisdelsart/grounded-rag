@@ -185,10 +185,11 @@ app = FastAPI(
 )
 
 # Hardening middleware (all opt-in/safe). Security headers are always added and
-# never alter the body or status. Rate limiting is a no-op unless
-# `rate_limit_per_minute` is positive, so the default config is unthrottled. The
-# request-id middleware is always active and only adds a header + logging
-# context.
+# never alter the body or status. Rate limiting reads the effective limit: it is
+# a no-op locally but auto-defaults to 60/min once public auth (`require_auth`)
+# is enabled, so the default local config is unthrottled while a public
+# deployment gets a sane throttle. The request-id middleware is always active and
+# only adds a header + logging context.
 #
 # Starlette runs the last-added middleware first, so the request-id layer is
 # outermost: it sets the request-id contextvar before anything else runs (so the
@@ -1674,7 +1675,17 @@ async def upload_document(
     with get_session(_engine) as session:
         _resolve_student(session, student_id, user)
     owner: str = student_id
+    # Read the whole upload into memory (ingestion needs the bytes anyway) and
+    # enforce the size cap on the actual byte count, not a client-supplied
+    # Content-Length header, so a spoofed header cannot slip an oversized file
+    # past the guard. This is a public-abuse safeguard.
     contents = await file.read()
+    max_bytes = get_settings().max_upload_mb * 1024 * 1024
+    if len(contents) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"File too large: max {get_settings().max_upload_mb} MB.",
+        )
     # Persist the original so the user can re-open the intact file later; ingest
     # from that stored path (its extension drives prose/PDF routing).
     stored_path = save_upload(contents, course, file.filename or "document")

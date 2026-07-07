@@ -139,13 +139,21 @@ class Settings(BaseSettings):
     # mutating endpoints and `/history`. `/health` is always open.
     api_key: str = ""
 
-    # In-process rate limit (opt-in). 0 disables it (the default), so the API is
-    # unthrottled and the test suite is never tripped. A positive value caps each
-    # client (by IP) to that many requests per rolling 60-second window; once
-    # exceeded the request is rejected with 429 and a `Retry-After` header. The
-    # limiter is per-process (a single Uvicorn worker); it is not a substitute for
-    # an edge rate limiter in a multi-replica deployment.
+    # In-process rate limit. 0 (the default) means "auto": the effective limit is
+    # derived from `require_auth` via `effective_rate_limit_per_minute` below, so
+    # a public deployment is throttled by default while local dev stays open. A
+    # positive value is an explicit operator override that always wins (set a very
+    # high number to effectively disable throttling in public mode). When active,
+    # each client (by IP) is capped to that many requests per rolling 60-second
+    # window; once exceeded the request is rejected with 429 and a `Retry-After`
+    # header. The limiter is per-process (a single Uvicorn worker); it is not a
+    # substitute for an edge rate limiter in a multi-replica deployment.
     rate_limit_per_minute: int = 0
+
+    # Maximum size, in megabytes, accepted by the document upload endpoint. Guards
+    # the public deployment against oversized/abusive uploads; a file larger than
+    # this is rejected with HTTP 413 before ingestion. Override via MAX_UPLOAD_MB.
+    max_upload_mb: int = 25
 
     # Send HTTP Strict-Transport-Security on every response. Off by default
     # because HSTS only makes sense behind HTTPS/TLS; enabling it on a plain-HTTP
@@ -201,6 +209,27 @@ class Settings(BaseSettings):
     # transcribe rasterized slides; the others use a general chat model.
     ollama_chat_model: str = "llama3.1"
     ollama_vision_model: str = "llama3.2-vision"
+
+    @property
+    def effective_rate_limit_per_minute(self) -> int:
+        """Resolve the rate limit actually enforced by the middleware.
+
+        Selection order:
+
+        1. An explicit positive `rate_limit_per_minute` always wins (operator
+           override): the deployment throttles at exactly that value.
+        2. Otherwise (`rate_limit_per_minute == 0`, the "auto" default) the limit
+           follows the deployment mode: **60** requests/minute when
+           `require_auth` is True (public mode gets a sane default throttle) and
+           **0** (off) when `require_auth` is False (local dev stays unthrottled,
+           so the test suite is never tripped).
+
+        To truly disable throttling in public mode, an operator sets a very high
+        explicit `rate_limit_per_minute` rather than 0.
+        """
+        if self.rate_limit_per_minute > 0:
+            return self.rate_limit_per_minute
+        return 60 if self.require_auth else 0
 
 
 @lru_cache
