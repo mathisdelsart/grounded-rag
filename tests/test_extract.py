@@ -85,8 +85,22 @@ def test_has_math_symbols_detects_symbols_and_latex():
     assert not has_math_symbols("A plain prose sentence about history.")
 
 
-def test_needs_vision_when_page_has_images():
-    feats = PageFeatures(image_count=2, text_length=5000, has_math_symbols=False)
+def test_needs_vision_when_image_only_page_has_little_text():
+    # An image with little recoverable text is image-based content: needs vision.
+    feats = PageFeatures(image_count=2, text_length=10, has_math_symbols=False)
+    assert needs_vision(feats) is True
+
+
+def test_text_rich_page_with_image_does_not_need_vision():
+    # A designed but text-heavy page (e.g. a cover letter with a logo) is fully
+    # recoverable by PyMuPDF: an embedded image alone must not force vision.
+    feats = PageFeatures(image_count=1, text_length=5000, has_math_symbols=False)
+    assert needs_vision(feats) is False
+
+
+def test_math_on_text_rich_page_still_needs_vision():
+    # Math needs vision fidelity even when the page is otherwise text-rich.
+    feats = PageFeatures(image_count=1, text_length=5000, has_math_symbols=True)
     assert needs_vision(feats) is True
 
 
@@ -173,7 +187,7 @@ def fake_fitz(monkeypatch):
 def test_hybrid_routes_plain_and_vision_pages(fake_fitz):
     plain = _FakePage("word " * 100, images=0)  # long, no math, no image
     mathy = _FakePage("E = mc^2", images=0)  # math symbols -> vision
-    figure = _FakePage("word " * 100, images=1)  # has image -> vision
+    figure = _FakePage("Fig. 1", images=1)  # image + little text -> vision
     fake_fitz([plain, mathy, figure])
 
     seen: list[str] = []
@@ -257,6 +271,38 @@ def test_extract_strips_fence_on_vision_pages_only(fake_fitz):
     assert result[0].text == "# Slide\n$E=mc^2$"
     # Plain-text page: PyMuPDF output is left exactly as-is, fences and all.
     assert result[1].text == ("```not code``` " + "word " * 100).strip()
+
+
+def test_text_rich_page_with_image_extracts_via_pymupdf(fake_fitz):
+    # A designed page (embedded image) that is text-heavy must be extracted for
+    # free with PyMuPDF, never sent to the vision model.
+    designed = _FakePage("word " * 100, images=1)
+    fake_fitz([designed])
+
+    calls = {"n": 0}
+
+    def stub(_uri: str) -> str:
+        calls["n"] += 1
+        return "VISION"
+
+    result = extract.extract_pdf("x.pdf", "Course", hybrid=True, transcriber=stub)
+
+    assert calls["n"] == 0  # vision never called
+    assert result[0].text == ("word " * 100).strip()
+
+
+def test_empty_vision_transcription_falls_back_to_pymupdf_text(fake_fitz):
+    # A page routed to vision (math symbols) whose transcription comes back empty
+    # (weak/absent local model) must fall back to the PyMuPDF text so the
+    # text-bearing page still indexes instead of being dropped as empty.
+    body = "E = mc^2 " + "word " * 100  # math -> vision, but full of real text
+    page = _FakePage(body, images=1)
+    fake_fitz([page])
+
+    result = extract.extract_pdf("x.pdf", "Course", hybrid=True, transcriber=lambda _uri: "")
+
+    assert result[0].text == body.strip()
+    assert result[0].text != ""
 
 
 def test_max_pages_caps_selection(fake_fitz):
