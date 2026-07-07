@@ -155,6 +155,7 @@ const en = {
   "auth.displayNamePlaceholder": "How should we call you?",
   "auth.cardTitle": "Sign in to your tutor",
   "auth.cardSubtitle": "Ask questions and get answers grounded in your own courses.",
+  "auth.close": "Close",
 
   // Blocking sign-in gate (shown when the backend enforces authentication).
   "gate.title": "Sign in to continue",
@@ -422,6 +423,10 @@ const en = {
     "Upload a PDF, Markdown or text file. It is indexed and becomes searchable in the tutor.",
   "doc.upload.file": "File",
   "doc.upload.fileHint": "PDF, Markdown (.md) or text (.txt).",
+  "doc.upload.dropzone": "Drag & drop a file here, or click to choose",
+  "doc.upload.dropzoneAria": "Drop zone — press Enter to choose a file",
+  "doc.upload.selectedFile": "Selected: {name}",
+  "doc.upload.unsupported": "Unsupported file type. Use a PDF, Markdown (.md) or text (.txt) file.",
   "doc.upload.course": "Course",
   "doc.upload.coursePlaceholder": "e.g. Wavelet Transform",
   "doc.upload.courseRequired": "Enter a course name to import.",
@@ -617,6 +622,7 @@ const fr: Record<TranslationKey, string> = {
   "auth.cardTitle": "Connectez-vous à votre tuteur",
   "auth.cardSubtitle":
     "Posez vos questions et obtenez des réponses ancrées dans vos propres cours.",
+  "auth.close": "Fermer",
 
   // Blocking sign-in gate (shown when the backend enforces authentication).
   "gate.title": "Connectez-vous pour continuer",
@@ -893,6 +899,10 @@ const fr: Record<TranslationKey, string> = {
     "Importez un PDF, du Markdown ou un fichier texte. Il est indexé et devient consultable dans le tuteur.",
   "doc.upload.file": "Fichier",
   "doc.upload.fileHint": "PDF, Markdown (.md) ou texte (.txt).",
+  "doc.upload.dropzone": "Glissez-déposez un fichier ici, ou cliquez pour choisir",
+  "doc.upload.dropzoneAria": "Zone de dépôt — appuyez sur Entrée pour choisir un fichier",
+  "doc.upload.selectedFile": "Sélectionné : {name}",
+  "doc.upload.unsupported": "Type de fichier non pris en charge. Utilisez un fichier PDF, Markdown (.md) ou texte (.txt).",
   "doc.upload.course": "Cours",
   "doc.upload.coursePlaceholder": "ex. Transformée en ondelettes",
   "doc.upload.courseRequired": "Indiquez le nom du cours pour importer.",
@@ -1079,6 +1089,7 @@ const nl: Record<TranslationKey, string> = {
   "auth.displayNamePlaceholder": "Hoe mogen we je noemen?",
   "auth.cardTitle": "Log in bij je tutor",
   "auth.cardSubtitle": "Stel vragen en krijg antwoorden op basis van je eigen cursussen.",
+  "auth.close": "Sluiten",
 
   // Blocking sign-in gate (shown when the backend enforces authentication).
   "gate.title": "Log in om verder te gaan",
@@ -1344,6 +1355,10 @@ const nl: Record<TranslationKey, string> = {
     "Upload een PDF-, Markdown- of tekstbestand. Het wordt geïndexeerd en doorzoekbaar in de tutor.",
   "doc.upload.file": "Bestand",
   "doc.upload.fileHint": "PDF, Markdown (.md) of tekst (.txt).",
+  "doc.upload.dropzone": "Sleep een bestand hierheen, of klik om te kiezen",
+  "doc.upload.dropzoneAria": "Sleepzone — druk op Enter om een bestand te kiezen",
+  "doc.upload.selectedFile": "Geselecteerd: {name}",
+  "doc.upload.unsupported": "Niet-ondersteund bestandstype. Gebruik een PDF-, Markdown- (.md) of tekstbestand (.txt).",
   "doc.upload.course": "Vak",
   "doc.upload.coursePlaceholder": "bijv. Wavelet-transformatie",
   "doc.upload.courseRequired": "Voer een cursusnaam in om te importeren.",
