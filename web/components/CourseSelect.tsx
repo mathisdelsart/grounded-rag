@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import { getCourses, type ConnectionConfig } from "@/lib/api";
+import { useEffect, useId } from "react";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 
@@ -12,81 +11,57 @@ const baseField =
   "dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500 " +
   "dark:focus:border-brand-400 dark:focus:ring-brand-400/20 dark:disabled:bg-zinc-800/50 dark:disabled:text-zinc-500";
 
-type FetchState = "loading" | "ready" | "error";
-
 interface CourseSelectProps {
   /** Current course filter value. Empty string means "All courses" (no filter). */
   value: string;
   /** Called with the chosen course, or an empty string for "All courses". */
   onChange: (course: string) => void;
-  config: ConnectionConfig;
+  /** Owner-scoped course list, fetched once by the page and shared across panels. */
+  courses: string[];
+  /** True while the shared course list is still loading. */
+  loading: boolean;
+  /** True when the shared course list failed to load. */
+  error: boolean;
   label?: string;
   hint?: string;
-  /**
-   * The effective student id (owner). When set, the course list is scoped to
-   * this account's own courses plus the shared/legacy corpus.
-   */
-  studentId?: string;
-  /**
-   * Bump this to force a re-fetch of the course list — e.g. after a document
-   * upload adds a new course. Any change of value re-runs the fetch effect, so
-   * a freshly indexed course appears without a manual page refresh.
-   */
-  refreshKey?: number;
 }
 
 /**
- * Course filter backed by `GET /courses`. Fetches the indexed courses on mount
- * and renders an accessible dropdown with an "All courses" option (sends no
- * filter). If the list is empty or the request fails, it degrades to a free-text
- * input so the filter never blocks the UI. Re-fetches when the connection target
- * changes; if the persisted value is missing from the returned list it is kept
- * as an extra option so a saved choice is not silently dropped.
+ * Course filter backed by the page's owner-scoped course list. Renders an
+ * accessible dropdown with an "All courses" option (sends no filter). If the
+ * list is empty or failed to load, it degrades to a free-text input so the
+ * filter never blocks the UI.
+ *
+ * A persisted selection is never trusted blindly: the stored course key lives
+ * in localStorage and survives across accounts, so once the list has loaded a
+ * value that is not in it (a stale choice, or one belonging to another account)
+ * is reset to "" ("All courses"). The parent's `onChange` clears the stored key.
  */
 export function CourseSelect({
   value,
   onChange,
-  config,
+  courses,
+  loading,
+  error,
   label,
   hint,
-  studentId,
-  refreshKey,
 }: CourseSelectProps) {
   const { t } = useT();
   const id = useId();
-  const [courses, setCourses] = useState<string[]>([]);
-  const [state, setState] = useState<FetchState>("loading");
 
-  const configRef = useRef(config);
-  configRef.current = config;
-
+  // Once the owner-scoped list has loaded, drop any selection that is not in it
+  // (a course from a previous account/session, or one that no longer exists) so
+  // the filter defaults to "All courses" rather than a phantom course.
   useEffect(() => {
-    let active = true;
-    setState("loading");
-    getCourses(configRef.current, studentId)
-      .then((list) => {
-        if (!active) return;
-        setCourses(list);
-        setState("ready");
-      })
-      .catch(() => {
-        if (!active) return;
-        setCourses([]);
-        setState("error");
-      });
-    return () => {
-      active = false;
-    };
-    // Re-run when the connection target or owner changes, or when refreshKey is
-    // bumped (e.g. after a document upload indexes a new course).
-  }, [config.baseUrl, config.apiKey, config.token, studentId, refreshKey]);
+    if (loading || error) return;
+    if (value && !courses.includes(value)) onChange("");
+  }, [loading, error, value, courses, onChange]);
 
   const resolvedLabel = label ?? t("ask.courseLabel");
 
   // Free-text fallback: request failed, or succeeded with no indexed courses.
-  if (state === "error" || (state === "ready" && courses.length === 0)) {
-    const resolvedHint =
-      state === "error" ? t("course.fetchFailed") : hint ?? t("ask.courseHint");
+  if (error || (!loading && courses.length === 0)) {
+    const resolvedHint = error ? t("course.fetchFailed") : hint ?? t("ask.courseHint");
     return (
       <div className="space-y-1.5">
         <label
@@ -107,11 +82,6 @@ export function CourseSelect({
     );
   }
 
-  const loading = state === "loading";
-  // Keep a persisted value that is not (yet) in the fetched list as an option.
-  const options =
-    value && !courses.includes(value) ? [value, ...courses] : courses;
-
   return (
     <div className="space-y-1.5">
       <label
@@ -130,7 +100,7 @@ export function CourseSelect({
         <option value="">
           {loading ? t("course.loading") : t("course.allCourses")}
         </option>
-        {options.map((course) => (
+        {courses.map((course) => (
           <option key={course} value={course}>
             {course}
           </option>

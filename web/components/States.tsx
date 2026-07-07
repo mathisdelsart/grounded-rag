@@ -2,6 +2,7 @@
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/Button";
 
 /** Neutral empty-state placeholder for a section with no content yet. */
 export function EmptyState({
@@ -54,6 +55,48 @@ export function Skeleton({ lines = 3 }: { lines?: number }) {
           <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/60 to-transparent dark:via-white/10" />
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Shown on the Ask / Exercise / Quiz tools when the signed-in user has no
+ * indexed courses yet. Grounding only from the user's own documents is the
+ * North Star, so with nothing indexed those tools cannot answer — instead of
+ * letting the user submit into the void, this points them straight at the
+ * Documents tab to import a course.
+ */
+export function NoCoursesState({ onImport }: { onImport: () => void }) {
+  const { t } = useT();
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 px-6 py-14 text-center dark:border-zinc-700 dark:bg-zinc-900/40">
+      <span
+        aria-hidden
+        className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950 dark:text-brand-300"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-5 w-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.7}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <path d="M7 10l5 5 5-5" />
+          <path d="M12 15V3" />
+        </svg>
+      </span>
+      <p className="text-base font-semibold text-zinc-800 dark:text-zinc-100">
+        {t("docsGate.title")}
+      </p>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        {t("docsGate.subtitle")}
+      </p>
+      <Button className="mt-5" onClick={onImport}>
+        {t("docsGate.button")}
+      </Button>
     </div>
   );
 }

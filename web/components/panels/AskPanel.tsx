@@ -19,7 +19,7 @@ import { CitationChip } from "@/components/CitationChip";
 import { Spinner } from "@/components/Spinner";
 import { ExportActions } from "@/components/ExportActions";
 import { AnswerFeedback } from "@/components/AnswerFeedback";
-import { EmptyState, RefusalBanner } from "@/components/States";
+import { EmptyState, NoCoursesState, RefusalBanner } from "@/components/States";
 import { AnswerProgress } from "@/components/AnswerProgress";
 import { LevelSelector } from "@/components/LevelSelector";
 import { useToast } from "@/components/Toast";
@@ -39,8 +39,14 @@ interface AskPanelProps {
   sourcesMax: number;
   /** Persist a new max-sources ceiling (clamped by the parent). */
   onSourcesMaxChange: (next: number) => void;
-  /** Bumped after an upload so the course selector re-fetches GET /courses. */
-  coursesRefreshKey?: number;
+  /** The user's indexed courses, lifted to the page and shared across panels. */
+  courses: string[];
+  /** True while the shared course list is still loading. */
+  coursesLoading: boolean;
+  /** True when the shared course list failed to load. */
+  coursesError: boolean;
+  /** Switch to the Documents tab so the user can import a course. */
+  onImport: () => void;
 }
 
 // Bounds for the max-sources control (mirrors the parent's clamp).
@@ -55,7 +61,10 @@ export function AskPanel({
   sessionId,
   sourcesMax,
   onSourcesMaxChange,
-  coursesRefreshKey,
+  courses,
+  coursesLoading,
+  coursesError,
+  onImport,
 }: AskPanelProps) {
   const toast = useToast();
   const { t, locale } = useT();
@@ -183,6 +192,19 @@ export function AskPanel({
     }
   }
 
+  // With no indexed courses there is nothing to ground an answer in, so the
+  // tool refuses to take a question and points the user to import a course.
+  if (!coursesLoading && courses.length === 0) {
+    return (
+      <Card>
+        <CardHeader title={t("ask.title")} description={t("ask.description")} />
+        <CardBody>
+          <NoCoursesState onImport={onImport} />
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <Card>
@@ -199,13 +221,15 @@ export function AskPanel({
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={submitOnCmdEnter(runAsk)}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/* Course · Chapter · Max sources on one compact row (they stack on
+              mobile). Max sources stays narrow since it is a small number. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <CourseSelect
               value={course}
               onChange={selectCourse}
-              config={config}
-              studentId={studentId}
-              refreshKey={coursesRefreshKey}
+              courses={courses}
+              loading={coursesLoading}
+              error={coursesError}
             />
             <TextField
               label={t("ask.chapterLabel")}
@@ -214,11 +238,6 @@ export function AskPanel({
               value={chapter}
               onChange={(e) => setChapter(e.target.value)}
             />
-          </div>
-          {/* Max sources — how many candidate passages retrieval pulls before
-              the answer cites only the useful ones. Kept compact and wired to
-              the page's persisted `sourcesMax`. */}
-          <div className="w-32">
             <TextField
               label={t("ask.maxSources")}
               hint={t("ask.maxSourcesHint")}
@@ -266,6 +285,16 @@ export function AskPanel({
             <RefusalBanner message={lastAnswer.answer} />
           ) : (
             <div className="space-y-5">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
+                  <path
+                    fillRule="evenodd"
+                    d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.79 6.8-6.79a1 1 0 0 1 1.4 0Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {t("hero.app.answered")}
+              </span>
               <Markdown>{lastAnswer.answer}</Markdown>
               <div className="border-t border-zinc-100 pt-4 dark:border-zinc-800">
                 <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">
