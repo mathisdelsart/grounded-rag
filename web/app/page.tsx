@@ -13,6 +13,7 @@ import { Button } from "@/components/Button";
 import { BrandMark } from "@/components/Logo";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useT } from "@/lib/i18n";
+import { useCourses } from "@/lib/useCourses";
 import { scrollToId } from "@/lib/scroll";
 import { Hero } from "@/components/Hero";
 import { HowItWorks } from "@/components/HowItWorks";
@@ -176,6 +177,18 @@ export default function Home() {
   // accounts on one browser never collide; logged out, the device id is kept
   // exactly as before.
   const effectiveStudentId = authUserId != null ? `u${authUserId}` : studentId;
+
+  // Single source of truth for the user's indexed courses. Fetched once here and
+  // fed to every course selector (so the list is not fetched once per panel) and
+  // used to gate the Ask/Exercise/Quiz tools: with nothing indexed, grounding is
+  // impossible, so those tools show an import call-to-action instead of a form.
+  // Re-fetches on account switch (effectiveStudentId) and after an upload.
+  const {
+    courses,
+    loading: coursesLoading,
+    error: coursesError,
+  } = useCourses(config, effectiveStudentId, coursesRefreshKey);
+  const goToDocuments = () => setActive("documents");
 
   // Close the sign-in modal on Escape so keyboard users are never stranded.
   useEffect(() => {
@@ -413,7 +426,10 @@ export default function Home() {
                     sessionId={activeSessionId}
                     sourcesMax={sourcesMax}
                     onSourcesMaxChange={updateSourcesMax}
-                    coursesRefreshKey={coursesRefreshKey}
+                    courses={courses}
+                    coursesLoading={coursesLoading}
+                    coursesError={coursesError}
+                    onImport={goToDocuments}
                   />
                 </div>
                 <div
@@ -427,7 +443,10 @@ export default function Home() {
                     studentId={effectiveStudentId}
                     config={config}
                     sessionId={activeSessionId}
-                    coursesRefreshKey={coursesRefreshKey}
+                    courses={courses}
+                    coursesLoading={coursesLoading}
+                    coursesError={coursesError}
+                    onImport={goToDocuments}
                   />
                 </div>
                 <div
@@ -441,7 +460,10 @@ export default function Home() {
                     studentId={effectiveStudentId}
                     config={config}
                     sessionId={activeSessionId}
-                    coursesRefreshKey={coursesRefreshKey}
+                    courses={courses}
+                    coursesLoading={coursesLoading}
+                    coursesError={coursesError}
+                    onImport={goToDocuments}
                   />
                 </div>
                 <div

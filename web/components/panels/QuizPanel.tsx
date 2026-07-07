@@ -17,7 +17,7 @@ import { TextField, TextArea } from "@/components/TextField";
 import { CourseSelect } from "@/components/CourseSelect";
 import { RigorSelector } from "@/components/RigorSelector";
 import { Markdown } from "@/components/Markdown";
-import { EmptyState, RefusalBanner } from "@/components/States";
+import { EmptyState, NoCoursesState, RefusalBanner } from "@/components/States";
 import { ThinkingIndicator } from "@/components/ThinkingIndicator";
 import { useToast } from "@/components/Toast";
 import { useT } from "@/lib/i18n";
@@ -30,8 +30,14 @@ interface QuizPanelProps {
   config: ConnectionConfig;
   /** Active thread id, or null; the generated quiz is filed under it. */
   sessionId: number | null;
-  /** Bumped after an upload so the course selector re-fetches GET /courses. */
-  coursesRefreshKey?: number;
+  /** The user's indexed courses, lifted to the page and shared across panels. */
+  courses: string[];
+  /** True while the shared course list is still loading. */
+  coursesLoading: boolean;
+  /** True when the shared course list failed to load. */
+  coursesError: boolean;
+  /** Switch to the Documents tab so the user can import a course. */
+  onImport: () => void;
 }
 
 /** Clamp a score to 0..100 for the progress meter. */
@@ -52,7 +58,10 @@ export function QuizPanel({
   studentId,
   config,
   sessionId,
-  coursesRefreshKey,
+  courses,
+  coursesLoading,
+  coursesError,
+  onImport,
 }: QuizPanelProps) {
   const toast = useToast();
   const { t, locale } = useT();
@@ -184,6 +193,19 @@ export function QuizPanel({
     }
   }
 
+  // Without any indexed course there is nothing to ground a quiz in, so the tool
+  // points the user to import a course instead of generating into the void.
+  if (!coursesLoading && courses.length === 0) {
+    return (
+      <Card>
+        <CardHeader title={t("quiz.title")} description={t("quiz.description")} />
+        <CardBody>
+          <NoCoursesState onImport={onImport} />
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <Card>
@@ -200,13 +222,13 @@ export function QuizPanel({
             onChange={(e) => setNotion(e.target.value)}
             onKeyDown={submitOnCmdEnter(generate)}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <CourseSelect
               value={course}
               onChange={selectCourse}
-              config={config}
-              studentId={studentId}
-              refreshKey={coursesRefreshKey}
+              courses={courses}
+              loading={coursesLoading}
+              error={coursesError}
             />
             <TextField
               label={t("ask.chapterLabel")}

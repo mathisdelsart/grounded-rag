@@ -169,6 +169,12 @@ const en = {
     "Create an account to index your own courses — your documents stay private to you.",
   "toolGate.button": "Sign in or create an account",
 
+  // No indexed courses yet (Ask / Exercise / Quiz tools require course material).
+  "docsGate.title": "No course material yet",
+  "docsGate.subtitle":
+    "Sourcio only answers from your own indexed documents. Import a course to get started.",
+  "docsGate.button": "Import documents",
+
   // Settings panel
   "settings.title": "Settings",
   "settings.studentId": "Student id",
@@ -271,7 +277,7 @@ const en = {
   "exercise.description": "A practice problem grounded in the course, using its notation.",
   "exercise.notionLabel": "What exercise do you want?",
   "exercise.notionPlaceholder":
-    "e.g. a medium-difficulty problem on the wavelet transform, with a full worked solution",
+    "e.g. a problem applying the Pythagorean theorem to find a triangle's hypotenuse",
   "exercise.generate": "Generate",
   "exercise.resultTitle": "Exercise",
   "exercise.empty.title": "No exercise yet",
@@ -298,7 +304,7 @@ const en = {
     "A set of practice questions grounded in the course, using its notation.",
   "quiz.notionLabel": "What should the quiz cover?",
   "quiz.notionPlaceholder":
-    "e.g. short questions on the wavelet transform, from its definition to a small calculation",
+    "e.g. short questions on the Pythagorean theorem, from statement to a small calculation",
   "quiz.questions": "Questions",
   "quiz.generate": "Generate",
   "quiz.resultTitle": "Quiz",
@@ -648,6 +654,12 @@ const fr: Record<TranslationKey, string> = {
     "Créez un compte pour indexer vos propres cours — vos documents restent privés.",
   "toolGate.button": "Se connecter ou créer un compte",
 
+  // Aucun cours indexé (les outils Poser / Exercice / Quiz nécessitent des supports).
+  "docsGate.title": "Aucun support de cours pour l'instant",
+  "docsGate.subtitle":
+    "Sourcio ne répond qu'à partir de vos propres documents indexés. Importez un cours pour commencer.",
+  "docsGate.button": "Importer des documents",
+
   // Settings panel
   "settings.title": "Paramètres",
   "settings.studentId": "Identifiant étudiant",
@@ -755,7 +767,7 @@ const fr: Record<TranslationKey, string> = {
     "Un problème d'entraînement ancré dans le cours, utilisant sa notation.",
   "exercise.notionLabel": "Quel exercice veux-tu ?",
   "exercise.notionPlaceholder":
-    "ex. un problème de difficulté moyenne sur la transformée en ondelettes, avec une solution détaillée",
+    "ex. un problème appliquant le théorème de Pythagore pour trouver l'hypoténuse d'un triangle",
   "exercise.generate": "Générer",
   "exercise.resultTitle": "Exercice",
   "exercise.empty.title": "Pas encore d'exercice",
@@ -784,7 +796,7 @@ const fr: Record<TranslationKey, string> = {
     "Un ensemble de questions d'entraînement ancrées dans le cours, utilisant sa notation.",
   "quiz.notionLabel": "Sur quoi doit porter le quiz ?",
   "quiz.notionPlaceholder":
-    "ex. des questions courtes sur la transformée en ondelettes, de sa définition à un petit calcul",
+    "ex. des questions courtes sur le théorème de Pythagore, de l'énoncé à un petit calcul",
   "quiz.questions": "Questions",
   "quiz.generate": "Générer",
   "quiz.resultTitle": "Quiz",
@@ -1126,6 +1138,12 @@ const nl: Record<TranslationKey, string> = {
     "Maak een account om je eigen cursussen te indexeren — je documenten blijven privé.",
   "toolGate.button": "Inloggen of een account aanmaken",
 
+  // Nog geen geïndexeerde cursus (de tools Vragen / Oefening / Quiz vereisen materiaal).
+  "docsGate.title": "Nog geen cursusmateriaal",
+  "docsGate.subtitle":
+    "Sourcio antwoordt alleen op basis van je eigen geïndexeerde documenten. Importeer een cursus om te beginnen.",
+  "docsGate.button": "Documenten importeren",
+
   // Settings panel
   "settings.title": "Instellingen",
   "settings.studentId": "Student-id",
@@ -1226,7 +1244,7 @@ const nl: Record<TranslationKey, string> = {
   "exercise.description": "Een oefenprobleem verankerd in de cursus, met diens notatie.",
   "exercise.notionLabel": "Welke oefening wil je?",
   "exercise.notionPlaceholder":
-    "bijv. een oefening van gemiddelde moeilijkheid over de wavelettransformatie, met een volledige uitgewerkte oplossing",
+    "bijv. een oefening waarin de stelling van Pythagoras wordt toegepast om de schuine zijde van een driehoek te vinden",
   "exercise.generate": "Genereren",
   "exercise.resultTitle": "Oefening",
   "exercise.empty.title": "Nog geen oefening",
@@ -1253,7 +1271,7 @@ const nl: Record<TranslationKey, string> = {
   "quiz.description": "Een reeks oefenvragen verankerd in de cursus, met diens notatie.",
   "quiz.notionLabel": "Waarover moet de quiz gaan?",
   "quiz.notionPlaceholder":
-    "bijv. korte vragen over de wavelettransformatie, van de definitie tot een kleine berekening",
+    "bijv. korte vragen over de stelling van Pythagoras, van de stelling tot een kleine berekening",
   "quiz.questions": "Vragen",
   "quiz.generate": "Genereren",
   "quiz.resultTitle": "Quiz",
