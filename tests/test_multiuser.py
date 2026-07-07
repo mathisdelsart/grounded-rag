@@ -271,8 +271,8 @@ def test_chapters_reject_foreign_student_id_when_enforced(client, monkeypatch):
     # account's student_id: ownership is enforced with a 403 before any read.
     monkeypatch.setattr(api_main, "list_chapters", lambda course, owner=None: ["Ch"])
 
-    token_a = _token(client, "cha@example.com")
-    token_b = _token(client, "chb@example.com")
+    token_a = _token(client, "cha")
+    token_b = _token(client, "chb")
     _set_require_auth(monkeypatch, True)
     # B claims its device student first.
     client.post("/ask", json={"student_id": "b-device", "question": "q"}, headers=_auth(token_b))
