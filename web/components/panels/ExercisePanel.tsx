@@ -56,7 +56,7 @@ export function ExercisePanel({
   coursesRefreshKey,
 }: ExercisePanelProps) {
   const toast = useToast();
-  const { t } = useT();
+  const { t, locale } = useT();
   const [notion, setNotion] = useState("");
   // Course/chapter scope retrieval so the exercise stays on the requested topic.
   // Lazy-init the course from localStorage so a choice is shared across tabs.
@@ -94,6 +94,8 @@ export function ExercisePanel({
         course.trim() || null,
         chapter.trim() || null,
         sessionId,
+        // Force the exercise to default to the current UI language.
+        locale,
       );
       setLastExercise(generated);
       // A fresh exercise invalidates any answer/verdict from the previous one.

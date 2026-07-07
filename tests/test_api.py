@@ -831,7 +831,7 @@ def test_grade_without_exercise_id_is_not_persisted(client, monkeypatch):
 def test_quiz_returns_questions_without_solutions(client, monkeypatch):
     captured = {}
 
-    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None):
+    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None, language=None):
         captured["args"] = (notion, n, student_id)
         captured["scope"] = (course, chapter)
         return {
@@ -875,7 +875,7 @@ def test_quiz_returns_questions_without_solutions(client, monkeypatch):
 def test_quiz_defaults_question_count(client, monkeypatch):
     captured = {}
 
-    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None):
+    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None, language=None):
         captured["n"] = n
         return {"quiz_id": 1, "notion": notion, "questions": [], "refused": False}
 
@@ -889,7 +889,7 @@ def test_quiz_surfaces_refusal(client, monkeypatch):
     monkeypatch.setattr(
         api_main,
         "generate_quiz",
-        lambda notion, n, student_id, *, course=None, chapter=None: {
+        lambda notion, n, student_id, *, course=None, chapter=None, language=None: {
             "quiz_id": None,
             "notion": notion,
             "questions": [],
@@ -909,7 +909,7 @@ def test_quiz_surfaces_refusal(client, monkeypatch):
 def test_quiz_records_activity_summary_in_history(client, monkeypatch):
     # A generated quiz is recorded as a concise activity turn with the distinct
     # "quiz" role: the notion and question count, never the full quiz JSON.
-    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None):
+    def fake_generate_quiz(notion, n, student_id, *, course=None, chapter=None, language=None):
         return {
             "quiz_id": 1,
             "notion": notion,
@@ -1161,7 +1161,7 @@ def _stub_nodes(monkeypatch):
     monkeypatch.setattr(
         api_main,
         "generate_quiz",
-        lambda notion, n, student_id, *, course=None, chapter=None: {
+        lambda notion, n, student_id, *, course=None, chapter=None, language=None: {
             "quiz_id": 1,
             "notion": notion,
             "questions": [{"id": 1, "problem": "Q?"}],
