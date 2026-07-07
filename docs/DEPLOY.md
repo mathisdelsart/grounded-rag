@@ -117,7 +117,10 @@ Spaces builds and runs it directly.
    | `JWT_SECRET` | a long random string | Signs access tokens. Never ship the insecure default. Generate e.g. `python -c "import secrets;print(secrets.token_urlsafe(48))"`. |
    | `CORS_ORIGINS` | your Vercel domain, e.g. `https://<project>.vercel.app` | Lets the browser call the Space from the Vercel origin. |
    | `ENABLE_HSTS` | `true` (optional) | The Space serves HTTPS, so HSTS is appropriate. |
-   | `API_KEY` | a random string (optional) | Extra gate: clients must send `X-API-Key`. Coexists with `REQUIRE_AUTH`. |
+   | `API_KEY` | a random string (optional) | Password-gate the whole API: clients must send a matching `X-API-Key`. Coexists with `REQUIRE_AUTH`. See [Access modes](#access-modes-open-demo-vs-password-gated). |
+   | `RATE_LIMIT_PER_MINUTE` | a positive integer (optional) | Per-IP request cap. **Auto-defaults to 60/min when `REQUIRE_AUTH=true`**, so a public deployment is throttled without extra config; set a higher explicit value to raise the ceiling. Leaving it unset (or `0`) means "auto" (off locally, 60 in public mode). |
+   | `MAX_UPLOAD_MB` | a positive integer (optional) | Maximum accepted upload size in MB. **Defaults to 25**; larger files are rejected with HTTP 413. |
+   | `DATABASE_URL` | `postgresql+psycopg://...` (optional) | Durable storage for accounts/history. SQLite on the Space is ephemeral — see [Persistent Postgres](#persistent-postgres-free-via-neon). |
    | `OPENAI_API_KEY` | your OpenAI key (optional) | Only if visitors will **upload their own PDFs** on the deployed app: the vision extraction path needs it. Not required for the pre-ingested course or for `.md`/`.txt` uploads. |
    | `RERANKER_MODEL` | e.g. `cross-encoder/ms-marco-MiniLM-L-6-v2` (optional) | Precision boost; adds CPU cost per query. |
 
@@ -137,8 +140,8 @@ Spaces builds and runs it directly.
 > Persistence note: the default SQLite database lives inside the container and is
 > reset when the Space rebuilds or sleeps, so accounts and history are ephemeral
 > on the free tier. For durable data, point `DATABASE_URL` at a managed Postgres
-> (see [POSTGRES.md](./POSTGRES.md)). Grounded answers, exercises, and grading all
-> work without it.
+> — see [Persistent Postgres (free) via Neon](#persistent-postgres-free-via-neon)
+> below. Grounded answers, exercises, and grading all work without it.
 
 > Free CPU Spaces sleep when idle and cold-start on the next request; the first
 > call after a nap is slow while the embedding model loads. Expected on the free tier.
@@ -158,16 +161,101 @@ The Next.js app lives in `web/`. `web/vercel.json` pins the framework to Next.js
    | Variable | Value | Required |
    |---|---|---|
    | `NEXT_PUBLIC_API_BASE_URL` | your Space URL, e.g. `https://<user>-<space-name>.hf.space` | **yes** |
-   | `NEXT_PUBLIC_API_KEY` | the same value you set as the API `API_KEY` secret | only if you set `API_KEY` on the Space |
+   | `NEXT_PUBLIC_API_KEY` | the same value you set as the API `API_KEY` secret | **open demo:** leave unset. **Password-gated:** see below |
 
-   Both are `NEXT_PUBLIC_*`, so they are inlined into the client bundle at build
-   time. If you change either value, **redeploy**. The base URL is read in
+   `NEXT_PUBLIC_*` variables are inlined into the client bundle at build time. If
+   you change either value, **redeploy**. The base URL is read in
    `web/lib/api.ts`; a trailing slash is fine (it is trimmed).
+
+   > **Do not bake `NEXT_PUBLIC_API_KEY` when you want a password gate.** Inlining
+   > it makes the public site auto-send the key to everyone, which defeats the
+   > gate entirely. Leave it unset and have gated visitors paste the key in
+   > Settings — see [Access modes](#access-modes-open-demo-vs-password-gated).
 4. Deploy. Vercel gives a public URL (e.g. `https://<project>.vercel.app`). Set
    the Space's `CORS_ORIGINS` to exactly that origin (section 3). Open the app:
    the health indicator turns green once it reaches the Space, and — after you
    register and log in — Ask / Re-explain / Exercise / Grade / Quiz / History work
    end to end.
+
+---
+
+## Access modes: open demo vs. password-gated
+
+The API supports two deployment postures. Pick one deliberately — the trade-off
+is public reach vs. private control, and the wiring differs.
+
+### Open demo (default)
+
+- API: `LLM_PROVIDER=groq`, **no** `API_KEY`.
+- Vercel: **do not** set `NEXT_PUBLIC_API_KEY`.
+
+Anyone can open the app, register an account, and use it on the free Groq tier.
+`REQUIRE_AUTH=true` still isolates each account to its own documents/history. This
+is the right choice for a public portfolio demo. Note the Groq free tier is
+token-rate-limited under load, so a burst of simultaneous users may hit a
+rate-limit error and should retry.
+
+### Password-gated (recruiters only)
+
+- API: set `API_KEY=<a long random secret>` (e.g.
+  `python -c "import secrets;print(secrets.token_urlsafe(24))"`).
+- Vercel: **do NOT set `NEXT_PUBLIC_API_KEY`.** Baking it into the build makes the
+  public site auto-send the key to every visitor, which defeats the gate.
+
+With `API_KEY` set and `NEXT_PUBLIC_API_KEY` unset, the deployed site cannot call
+the API until a visitor supplies the key: they open the app, go to **Settings**,
+and paste the secret (sent as the `X-API-Key` header on every request). Share the
+key privately with the people you want to let in (e.g. recruiters). This keeps the
+site effectively private **without** running email/user management or an invite
+system — the shared secret *is* the gate. The trade-off: anyone with the key has
+full access, and there is no per-person revocation short of rotating the key.
+
+---
+
+## Persistent Postgres (free) via Neon
+
+SQLite on Hugging Face Spaces is **ephemeral**: it lives inside the container, so a
+Space rebuild or an idle sleep/cold-start **wipes all accounts and history**.
+Grounded answers still work (the course lives in Qdrant), but users lose their
+logins. For a durable demo, back the app with a free managed Postgres.
+
+1. Create a free Postgres — **[Neon](https://neon.tech)** (or
+   [Supabase](https://supabase.com)); both have a no-card free tier. Copy the
+   connection string.
+2. Make sure the API image includes the `postgres` extra (it ships the `psycopg`
+   driver): `uv sync --extra postgres` locally, or the Docker build already
+   installs it.
+3. Set the Space secret in `postgresql+psycopg://` form (SQLAlchemy + `psycopg`
+   v3), e.g.:
+
+   ```
+   DATABASE_URL=postgresql+psycopg://<user>:<password>@<host>/<db>?sslmode=require
+   ```
+
+4. Run the migrations against it once so the schema exists:
+
+   ```bash
+   DATABASE_URL="postgresql+psycopg://..." alembic upgrade head
+   ```
+
+Full details, the exact URL shape, and local testing are in
+[POSTGRES.md](./POSTGRES.md).
+
+---
+
+## Seed a demo account at deploy time
+
+So a visitor sees a filled, working app on first load (not an empty shell):
+after deploying, **register one demo account** through the app and **ingest a
+neutral, non-personal sample course** into it (a public lecture deck, an
+open-courseware chapter — anything you are comfortable showing the world). Then
+display those demo credentials on the landing page so anyone can log in and try
+Ask / Exercise / Quiz immediately.
+
+> ⚠️ **Never expose personal documents in the public demo.** Do not ingest your
+> CV, thesis, private notes, or any sensitive material into the demo account —
+> once ingested, its content is retrievable by anyone who logs in. Keep the demo
+> corpus strictly neutral and shareable.
 
 ---
 
@@ -197,6 +285,11 @@ The Next.js app lives in `web/`. `web/vercel.json` pins the framework to Next.js
   minute. This is fine for a portfolio/demo with light traffic; a burst of
   simultaneous users may hit a rate-limit error and should retry. Set
   `LLM_BUDGET_TOKENS` and/or `API_KEY` on the Space if you want an extra ceiling.
+- **Built-in per-IP throttle.** With `REQUIRE_AUTH=true` the API auto-applies a
+  60 requests/minute per-IP cap (rejecting excess with HTTP 429), so a public
+  deployment is protected without extra config. Raise it with an explicit
+  `RATE_LIMIT_PER_MINUTE`. Uploads are additionally capped at `MAX_UPLOAD_MB`
+  (default 25 MB, rejected with HTTP 413).
 - **Ingestion is the one paid touchpoint** — and only if you ingest scanned/slide
   PDFs, whose math-aware vision extraction uses OpenAI. Run it once, locally,
   against the cloud cluster (section 2). `.md`/`.txt` prose ingestion uses no LLM
