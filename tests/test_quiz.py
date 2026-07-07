@@ -59,7 +59,9 @@ _TWO_QUESTIONS = (
 
 
 def _patch_llm(monkeypatch, reply: str) -> None:
-    monkeypatch.setattr("agent.nodes.quiz.get_llm", lambda role="default": _FakeLLM(reply))
+    monkeypatch.setattr(
+        "agent.nodes.quiz.get_llm", lambda role="default", api_key=None: _FakeLLM(reply)
+    )
 
 
 def _patch_retrieve(monkeypatch, results, captured: dict | None = None) -> None:
@@ -82,7 +84,9 @@ def test_generate_quiz_threads_language_into_prompt(engine, monkeypatch):
             return _FakeMessage(_TWO_QUESTIONS)
 
     _patch_retrieve(monkeypatch, _make_retrieved("Group axioms."))
-    monkeypatch.setattr("agent.nodes.quiz.get_llm", lambda role="default": _CapturingLLM())
+    monkeypatch.setattr(
+        "agent.nodes.quiz.get_llm", lambda role="default", api_key=None: _CapturingLLM()
+    )
 
     generate_quiz("groups", 2, "zoe", language="fr")
 
@@ -246,7 +250,7 @@ def test_grade_quiz_answer_scores_and_persists(engine, monkeypatch):
     # Grade reuses the existing judge node; mock its LLM.
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 90, "feedback": "Correct."}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 90, "feedback": "Correct."}'),
     )
 
     verdict = grade_quiz_answer(quiz_id, question_id, "Closure holds.", "zoe")
@@ -277,7 +281,9 @@ def test_grade_quiz_answer_uses_stored_reference(engine, monkeypatch):
             captured["human"] = messages[-1][1]
             return _FakeMessage('{"score": 50, "feedback": "ok"}')
 
-    monkeypatch.setattr("agent.nodes.grade.get_llm", lambda role="default": _CaptureLLM())
+    monkeypatch.setattr(
+        "agent.nodes.grade.get_llm", lambda role="default", api_key=None: _CaptureLLM()
+    )
 
     grade_quiz_answer(quiz_id, question_id, "some answer", "zoe")
     # The stored reference solution for question 0 was "By axiom 1.".
@@ -302,7 +308,9 @@ def test_grade_quiz_answer_applies_rigor_guidance(engine, monkeypatch):
             captured["human"] = messages[-1][1]
             return _FakeMessage('{"score": 50, "feedback": "ok"}')
 
-    monkeypatch.setattr("agent.nodes.grade.get_llm", lambda role="default": _CaptureLLM())
+    monkeypatch.setattr(
+        "agent.nodes.grade.get_llm", lambda role="default", api_key=None: _CaptureLLM()
+    )
 
     grade_quiz_answer(quiz_id, question_id, "answer", "zoe", "strict")
     assert _RIGOR_GUIDANCE["strict"] in captured["human"]
@@ -328,8 +336,12 @@ def test_summarize_quiz_threads_rigor_to_judge(engine, monkeypatch):
             seen.append(messages[-1][1])
             return _FakeMessage('{"score": 70, "feedback": "ok"}')
 
-    monkeypatch.setattr("agent.nodes.grade.get_llm", lambda role="default": _CaptureLLM())
-    monkeypatch.setattr("agent.nodes.quiz.get_llm", lambda role="default": _FakeLLM("Keep going."))
+    monkeypatch.setattr(
+        "agent.nodes.grade.get_llm", lambda role="default", api_key=None: _CaptureLLM()
+    )
+    monkeypatch.setattr(
+        "agent.nodes.quiz.get_llm", lambda role="default", api_key=None: _FakeLLM("Keep going.")
+    )
 
     summarize_quiz(quiz_id, [{"question_id": q0, "answer": "a0"}], "zoe", "lenient")
     # The lenient guidance was applied when grading the answer.
@@ -348,11 +360,11 @@ def test_summarize_quiz_averages_and_recommends(engine, monkeypatch):
     # (quiz node) returns a fixed study tip.
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 80, "feedback": "Good."}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 80, "feedback": "Good."}'),
     )
     monkeypatch.setattr(
         "agent.nodes.quiz.get_llm",
-        lambda role="default": _FakeLLM("Revise the group axioms."),
+        lambda role="default", api_key=None: _FakeLLM("Revise the group axioms."),
     )
 
     summary = summarize_quiz(
@@ -380,11 +392,11 @@ def test_summarize_quiz_skips_unknown_questions(engine, monkeypatch):
 
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 60, "feedback": "ok"}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 60, "feedback": "ok"}'),
     )
     monkeypatch.setattr(
         "agent.nodes.quiz.get_llm",
-        lambda role="default": _FakeLLM("Keep practising."),
+        lambda role="default", api_key=None: _FakeLLM("Keep practising."),
     )
 
     # One valid answer plus one for a nonexistent question id: the latter is
@@ -406,7 +418,7 @@ def test_summarize_quiz_without_graded_questions_has_no_recommendation(engine, m
     quiz_id = result["quiz_id"]
 
     # No recommendation LLM call should be made when nothing can be graded.
-    def _boom(role="default"):
+    def _boom(role="default", api_key=None):
         raise AssertionError("recommendation LLM must not be called")
 
     monkeypatch.setattr("agent.nodes.quiz.get_llm", _boom)
@@ -424,7 +436,7 @@ def test_grade_quiz_answer_unknown_question_returns_none(engine, monkeypatch):
 
     monkeypatch.setattr(
         "agent.nodes.grade.get_llm",
-        lambda role="default": _FakeLLM('{"score": 1, "feedback": "x"}'),
+        lambda role="default", api_key=None: _FakeLLM('{"score": 1, "feedback": "x"}'),
     )
 
     # Nonexistent question id, and a real question id under the wrong quiz id.

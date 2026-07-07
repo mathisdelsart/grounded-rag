@@ -82,8 +82,13 @@ def generate(state: TutorState) -> TutorState:
     chapter_filter = state.get("chapter")
     # Strictly scope to the requesting student's own material so an exercise is
     # never built from another account's uploads (nor the owner-less legacy corpus).
+    api_key = state.get("api_key")
     results = retrieve(
-        message, course=course_filter, chapter=chapter_filter, owner=state.get("student_id")
+        message,
+        course=course_filter,
+        chapter=chapter_filter,
+        owner=state.get("student_id"),
+        api_key=api_key,
     )
     if not results:
         return {
@@ -93,7 +98,7 @@ def generate(state: TutorState) -> TutorState:
 
     prompt = f"Sources:\n{format_numbered_sources(results)}\n\nNotion: {message}"
     raw = (
-        get_llm("generate")
+        get_llm("generate", api_key=api_key)
         .invoke(
             [("system", _system_prompt(state.get("language"))), ("human", prompt)],
             config={"callbacks": get_callbacks()},

@@ -197,7 +197,7 @@ def test_exercise_and_quiz_activity_attach_to_session(client, monkeypatch):
     monkeypatch.setattr(
         api_main,
         "generate_quiz",
-        lambda notion, n, student_id, *, course=None, chapter=None, language=None: {
+        lambda notion, n, student_id, *, course=None, chapter=None, language=None, api_key=None: {
             "quiz_id": 1,
             "notion": notion,
             "questions": [{"id": 1, "problem": "Q1?"}],

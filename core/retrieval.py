@@ -455,6 +455,7 @@ def retrieve(
     scorer: Scorer | None = None,
     hyde: bool = False,
     expand_neighbors: bool | None = None,
+    api_key: str | None = None,
 ) -> list[Retrieved]:
     """Return up to k chunks for the question, best first.
 
@@ -501,7 +502,9 @@ def retrieve(
     is None only on the offline/CLI/eval path; the API always passes the caller's
     id (required on ``AskRequest``), so a user read is always owner-scoped.
     ``scorer`` is injectable for testing; when None the configured cross-encoder
-    model is used.
+    model is used. ``api_key`` is an optional per-request OpenAI key forwarded to
+    the HyDE probe LLM (see :func:`core.query.hyde_passage`); it does not affect
+    the dense/sparse search itself and defaults to the free model when None.
     """
     settings = get_settings()
     client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
@@ -520,7 +523,7 @@ def retrieve(
     # On the HyDE path, embed a hypothetical answer passage for the dense branch
     # instead of the bare question. hyde_passage() never raises and falls back to
     # the question, so HyDE degrades to a plain dense query on any LLM error.
-    dense_text = hyde_passage(question) if hyde else None
+    dense_text = hyde_passage(question, api_key=api_key) if hyde else None
 
     candidates = _fetch_candidates(
         client,
@@ -563,6 +566,7 @@ def retrieve_multi(
     chapter: str | None = None,
     owner: str | None = None,
     scorer: Scorer | None = None,
+    api_key: str | None = None,
 ) -> list[Retrieved]:
     """Multi-query retrieval: expand the question, retrieve per query, then fuse.
 
@@ -584,7 +588,7 @@ def retrieve_multi(
     callers keep using :func:`retrieve` unchanged.
     """
     settings = get_settings()
-    queries = expand_query(question, n=settings.multi_query_n)
+    queries = expand_query(question, n=settings.multi_query_n, api_key=api_key)
 
     client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key)
     query_filter = _build_filter(course, chapter, owner)

@@ -49,16 +49,13 @@ def client():
 @pytest.fixture(autouse=True)
 def _stub_answer(monkeypatch):
     """Stub the grounded answer so /ask never reaches an LLM or vector store."""
-    monkeypatch.setattr(
-        api_main,
-        "answer",
-        lambda question, *, k=5, course=None, chapter=None, owner=None, language=None: {
-            "answer": "ok",
-            "refused": False,
-            "sources": [],
-            "raw": "ok",
-        },
-    )
+
+    def _fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
+
+    monkeypatch.setattr(api_main, "answer", _fake_answer)
 
 
 def _set_require_auth(monkeypatch, value):
@@ -153,7 +150,9 @@ def test_first_authenticated_caller_claims_unclaimed_student(client, monkeypatch
 
 
 def test_stream_rejects_foreign_student_before_streaming(client, monkeypatch):
-    def _fake_stream(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def _fake_stream(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         yield {"type": "sources", "sources": [], "refused": False, "answer": "ok"}
 
     monkeypatch.setattr(api_main, "stream_answer", _fake_stream)

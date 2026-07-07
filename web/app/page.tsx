@@ -45,6 +45,11 @@ export default function Home() {
   const [studentId, setStudentId] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  // The visitor's own OpenAI key. When set it is sent on every request so all
+  // LLM calls use their premium OpenAI model instead of the free one. Kept in the
+  // browser (localStorage) only; shared with the Documents upload card and the
+  // account menu via the same storage key.
+  const [openaiKey, setOpenaiKey] = useState("");
   // Max candidate-source pool (`k`) for Ask; configurable in Settings.
   const [sourcesMax, setSourcesMax] = useState(DEFAULT_SOURCES_MAX);
   const [token, setToken] = useState("");
@@ -88,6 +93,7 @@ export default function Home() {
     setStudentId(id);
     setBaseUrl(readLocal(KEYS.baseUrl));
     setApiKey(readLocal(KEYS.apiKey));
+    setOpenaiKey(readLocal(KEYS.openaiKey));
     const storedToken = readLocal(KEYS.authToken);
     setToken(storedToken);
     setAuthUsername(readLocal(KEYS.authUsername));
@@ -113,9 +119,19 @@ export default function Home() {
       baseUrl: baseUrl || undefined,
       apiKey: apiKey || undefined,
       token: token || undefined,
+      openaiKey: openaiKey || undefined,
     }),
-    [baseUrl, apiKey, token],
+    [baseUrl, apiKey, token, openaiKey],
   );
+
+  // Update the visitor's own OpenAI key (from the account menu or the Documents
+  // upload card) and persist it so it survives reloads and stays in sync across
+  // both places. Trimmed on write so a blank value clears it.
+  function updateOpenaiKey(next: string) {
+    const trimmed = next.trim();
+    setOpenaiKey(trimmed);
+    writeLocal(KEYS.openaiKey, trimmed);
+  }
 
   // Learn whether the backend enforces authentication (once ready, and whenever
   // the connection target changes). getConfig swallows errors and returns
@@ -266,12 +282,36 @@ export default function Home() {
           {/* Language + sign-in are direct flex children, so `justify-between`
               spreads logo · nav · language · sign-in with equal gaps between
               each — generous breathing room on both sides of the language. */}
+          {/* When a personal OpenAI key is set, show a discreet badge so it is
+              obvious the free model is replaced by a premium one everywhere. */}
+          {openaiKey && (
+            <span
+              className="hidden items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-flex dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
+              title={t("settings.openaiKey.badgeTitle")}
+            >
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
+              </svg>
+              {t("settings.openaiKey.badge")}
+            </span>
+          )}
           <LanguageToggle />
           <AuthMenu
             config={config}
             username={authUsername || null}
             onLogin={onLogin}
             onLogout={onLogout}
+            openaiKey={openaiKey}
+            onOpenaiKeyChange={updateOpenaiKey}
           />
         </div>
       </header>
@@ -497,6 +537,8 @@ export default function Home() {
                     studentId={effectiveStudentId}
                     config={config}
                     onCoursesChanged={() => setCoursesRefreshKey((k) => k + 1)}
+                    openaiKey={openaiKey}
+                    onOpenaiKeyChange={updateOpenaiKey}
                   />
                 </div>
               </div>

@@ -151,6 +151,7 @@ def generate_quiz(
     course: str | None = None,
     chapter: str | None = None,
     language: str | None = None,
+    api_key: str | None = None,
 ) -> dict[str, Any]:
     """Generate a course-grounded quiz of ``n`` questions on ``notion``.
 
@@ -159,6 +160,8 @@ def generate_quiz(
     (and chapter) so the quiz stays on the requested material; when both are
     None the whole collection is searched. ``language`` (a locale code) forces
     the quiz's prose into that language regardless of the source language.
+    ``api_key`` is an optional per-request OpenAI key: when set, generation runs
+    on the visitor's own OpenAI model instead of the free default.
     Returns a refusal (``refused=True``,
     empty ``questions``) when nothing relevant is found or the model produces no
     usable question, never inventing content. On success the quiz and its
@@ -172,13 +175,17 @@ def generate_quiz(
     n = max(1, int(n))
     # Strictly scope to the requesting student's own material so a quiz is never
     # built from another account's uploads (nor the owner-less legacy corpus).
-    results = retrieve(notion, course=course, chapter=chapter, owner=student_id)
+    results = retrieve(notion, course=course, chapter=chapter, owner=student_id, api_key=api_key)
     if not results:
         return {"quiz_id": None, "notion": notion, "questions": [], "refused": True}
 
     system = _system_prompt(n, language)
     prompt = f"Sources:\n{format_numbered_sources(results)}\n\nNotion: {notion}"
-    raw = get_llm("generate").invoke([("system", system), ("human", prompt)]).content.strip()
+    raw = (
+        get_llm("generate", api_key=api_key)
+        .invoke([("system", system), ("human", prompt)])
+        .content.strip()
+    )
 
     # The model is the coverage judge: when the retrieved sources do not actually
     # cover the requested notion (e.g. the quiz was scoped to the wrong course, or
@@ -221,6 +228,7 @@ def summarize_quiz(
     answers: list[dict[str, Any]],
     student_id: str | None = None,
     rigor: Rigor = DEFAULT_RIGOR,
+    api_key: str | None = None,
 ) -> dict[str, Any]:
     """Grade a whole quiz at once and return a final score plus a recommendation.
 
@@ -249,7 +257,7 @@ def summarize_quiz(
         question_id = int(raw_id)
         answer = str(item.get("answer", ""))
         answer_by_id[question_id] = answer
-        verdict = grade_quiz_answer(quiz_id, question_id, answer, student_id, rigor)
+        verdict = grade_quiz_answer(quiz_id, question_id, answer, student_id, rigor, api_key)
         if verdict is None:
             continue
         results.append(
@@ -274,7 +282,7 @@ def summarize_quiz(
     ]
     human = f"Overall score: {total}/100.\n\n" + "\n\n".join(blocks)
     recommendation = (
-        get_llm("grade")
+        get_llm("grade", api_key=api_key)
         .invoke(
             [("system", _RECOMMEND_SYSTEM), ("human", human)],
             config={"callbacks": get_callbacks()},
@@ -291,6 +299,7 @@ def grade_quiz_answer(
     answer: str,
     student_id: str | None,
     rigor: Rigor = DEFAULT_RIGOR,
+    api_key: str | None = None,
 ) -> dict[str, Any] | None:
     """Grade ``answer`` against a stored quiz question's reference solution.
 
@@ -324,7 +333,12 @@ def grade_quiz_answer(
             # Reuse the existing judge node with the stored reference solution,
             # passing the marking strictness so the shared rigor guidance applies.
             verdict = grade(
-                {"message": answer, "exercise": {"solution": reference}, "rigor": rigor}
+                {
+                    "message": answer,
+                    "exercise": {"solution": reference},
+                    "rigor": rigor,
+                    "api_key": api_key,
+                }
             ).get("grade")
             assert verdict is not None
 

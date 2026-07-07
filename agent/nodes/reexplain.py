@@ -76,7 +76,7 @@ def _messages(state: TutorState) -> list[tuple[str, str]]:
 def reexplain(state: TutorState) -> TutorState:
     """Reformulate the previous explanation at the requested level."""
     raw = (
-        get_llm("reexplain")
+        get_llm("reexplain", api_key=state.get("api_key"))
         .invoke(_messages(state), config={"callbacks": get_callbacks()})
         .content.strip()
     )
@@ -100,7 +100,7 @@ def stream_reexplain(state: TutorState) -> Iterator[dict]:
       fully assembled, stripped re-explanation.
     """
     parts: list[str] = []
-    for piece in get_llm("reexplain").stream(
+    for piece in get_llm("reexplain", api_key=state.get("api_key")).stream(
         _messages(state), config={"callbacks": get_callbacks()}
     ):
         delta = piece.content

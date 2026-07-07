@@ -57,16 +57,17 @@ def _keyword_intent(message: str) -> Intent:
     return DEFAULT_INTENT
 
 
-def classify_intent(message: str) -> Intent:
+def classify_intent(message: str, api_key: str | None = None) -> Intent:
     """Classify a message into one intent label.
 
     The primary path asks ``get_llm('router')``; any answer outside the known
     labels falls back to a keyword heuristic, so the router never emits an
-    invalid route.
+    invalid route. ``api_key`` is an optional per-request OpenAI key: when set,
+    the router runs on the visitor's own OpenAI model instead of the free default.
     """
     try:
         raw = (
-            get_llm("router")
+            get_llm("router", api_key=api_key)
             .invoke(
                 [("system", _ROUTER_SYSTEM), ("human", message)],
                 config={"callbacks": get_callbacks()},
@@ -84,7 +85,7 @@ def classify_intent(message: str) -> Intent:
 
 def router(state: TutorState) -> TutorState:
     """Entry node: write the classified intent into the state."""
-    return {"intent": classify_intent(state.get("message", ""))}
+    return {"intent": classify_intent(state.get("message", ""), state.get("api_key"))}
 
 
 def route(state: TutorState) -> Intent:

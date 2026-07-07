@@ -177,6 +177,14 @@ export interface ConnectionConfig {
   apiKey?: string;
   /** Bearer JWT for the logged-in user. Sent in addition to the API key. */
   token?: string;
+  /**
+   * The visitor's own OpenAI key. When set it is sent as the `X-OpenAI-Key`
+   * header on every request, so all LLM calls (Ask, Re-explain, Exercise, Quiz,
+   * grading) — and document upload — run on the visitor's own premium OpenAI
+   * model instead of the free default. Kept only in the browser; never persisted
+   * server-side.
+   */
+  openaiKey?: string;
 }
 
 /** Minimal public view of an authenticated user. */
@@ -222,6 +230,10 @@ function resolveApiKey(config?: ConnectionConfig): string {
   return (config?.apiKey ?? envApiKey()).trim();
 }
 
+function resolveOpenaiKey(config?: ConnectionConfig): string {
+  return (config?.openaiKey ?? "").trim();
+}
+
 function buildHeaders(config?: ConnectionConfig, json = false): Headers {
   const headers = new Headers();
   if (json) {
@@ -235,6 +247,12 @@ function buildHeaders(config?: ConnectionConfig, json = false): Headers {
   const token = config?.token?.trim();
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
+  }
+  // The visitor's own OpenAI key, when set: sent on every request so all LLM
+  // calls (and upload) use their premium OpenAI model instead of the free one.
+  const openaiKey = resolveOpenaiKey(config);
+  if (openaiKey) {
+    headers.set("X-OpenAI-Key", openaiKey);
   }
   return headers;
 }

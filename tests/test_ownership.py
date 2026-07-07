@@ -43,16 +43,13 @@ def client():
 @pytest.fixture(autouse=True)
 def _stub_answer(monkeypatch):
     """Stub the grounded answer so /ask never reaches an LLM or vector store."""
-    monkeypatch.setattr(
-        api_main,
-        "answer",
-        lambda question, *, k=5, course=None, chapter=None, owner=None, language=None: {
-            "answer": "ok",
-            "refused": False,
-            "sources": [],
-            "raw": "ok",
-        },
-    )
+
+    def _fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
+
+    monkeypatch.setattr(api_main, "answer", _fake_answer)
 
 
 def _token(client, username="owner", password="supersecret"):
@@ -144,7 +141,9 @@ def test_foreign_ask_is_rejected_before_answer_runs(client, monkeypatch):
     # answer stub records whether it was invoked; it must stay untouched.
     calls: list[str] = []
 
-    def _tracking_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def _tracking_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         calls.append(question)
         return {"answer": "ok", "refused": False, "sources": [], "raw": "ok"}
 
@@ -302,7 +301,9 @@ def _wait_for_ask_job(client, job_id, student_id, token=None, *, timeout=5.0):
 def test_foreign_caller_cannot_read_another_users_ask_job(client, monkeypatch):
     # A background answer job is owner-scoped: a second logged-in user cannot poll
     # a job started for another account's student, even with the right id.
-    def fake_stream_answer(question, *, k=5, course=None, chapter=None, owner=None, language=None):
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
         yield {"type": "token", "text": "grounded [1]"}
         yield {
             "type": "sources",

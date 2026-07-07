@@ -74,7 +74,7 @@ def fake_llm(monkeypatch):
 
     holder = {"reply": "", "last": None}
 
-    def _factory(role: str = "default"):
+    def _factory(role: str = "default", api_key=None):
         llm = _FakeLLM(holder["reply"])
         holder["last"] = llm
         return llm
@@ -134,7 +134,7 @@ def test_classify_falls_back_to_keywords_when_router_llm_raises(monkeypatch):
         def invoke(self, messages, config=None):
             raise RuntimeError("router transport down")
 
-    monkeypatch.setattr(graph_mod, "get_llm", lambda role="default": _RaisingLLM())
+    monkeypatch.setattr(graph_mod, "get_llm", lambda role="default", api_key=None: _RaisingLLM())
 
     assert classify_intent("Please give me an exercise on Fourier") == "generate"
     assert classify_intent("Can you grade my answer?") == "grade"
