@@ -73,19 +73,28 @@ def needs_vision(features: PageFeatures) -> bool:
     """Decide whether a page is math/figure-heavy and needs vision transcription.
 
     Pure function over simple page features so it is unit-testable without a PDF
-    or any API call. A page needs vision when any of the following holds:
+    or any API call. A page needs vision when either of the following holds:
 
-    - it embeds one or more images (figures/diagrams or rendered formulas);
-    - it exposes math-like symbols, which signal formulas PyMuPDF may garble;
-    - it yields very little recoverable text, suggesting image-based content.
+    - it exposes math-like symbols, which signal formulas PyMuPDF may garble
+      (math needs vision fidelity, even on an otherwise text-rich page);
+    - it yields little recoverable text, suggesting image-based content -- and,
+      on such a page, an embedded image confirms the content is not extractable.
+
+    An embedded image alone does NOT force vision on a text-rich page: a
+    visually designed document (e.g. a cover letter with a logo or a background
+    image) still has fully recoverable text, so it is extracted for free with
+    PyMuPDF rather than pushed onto the (paid, or weak/local) vision model.
 
     Otherwise the page is plain prose and can be extracted for free.
     """
-    if features.image_count > 0:
-        return True
     if features.has_math_symbols:
         return True
-    return features.text_length < _MIN_PLAIN_TEXT_LEN
+    # Text-rich page: recoverable by PyMuPDF for free, even with an image.
+    if features.text_length >= _MIN_PLAIN_TEXT_LEN:
+        return False
+    # Little recoverable text: an embedded image (or a near-empty page) means
+    # the content is image-based and must be transcribed by the vision model.
+    return features.image_count > 0 or features.text_length < _MIN_PLAIN_TEXT_LEN
 
 
 def _page_features(page) -> PageFeatures:
@@ -291,17 +300,22 @@ def extract_pdf(
     # First pass: classify the selected pages and resolve plain-text pages for
     # free. Vision pages are recorded as pending jobs to run concurrently. The
     # dicts are keyed by page number so the requested order is honored later.
+    # For every vision page we also capture whatever text PyMuPDF can recover,
+    # to use as a fallback if the vision transcription comes back empty.
     plain: dict[int, str] = {}
     vision_jobs: list[tuple[int, str]] = []
+    vision_fallback: dict[int, str] = {}
 
     for page_no in order:
         page = doc[page_no - 1]
+        # Default mode returns a str; guard keeps the type checker honest
+        # against PyMuPDF's broad get_text() overloads.
+        raw = page.get_text()
+        text = (raw if isinstance(raw, str) else "").strip()
         if hybrid and not needs_vision(_page_features(page)):
-            # Default mode returns a str; guard keeps the type checker honest
-            # against PyMuPDF's broad get_text() overloads.
-            text = page.get_text()
-            plain[page_no] = (text if isinstance(text, str) else "").strip()
+            plain[page_no] = text
         else:
+            vision_fallback[page_no] = text
             vision_jobs.append((page_no, _render_page(page, dpi)))
 
     doc.close()
@@ -322,6 +336,15 @@ def extract_pdf(
 
     result: list[Page] = []
     for page_no in order:
-        text = plain[page_no] if page_no in plain else transcribed[page_no]
+        if page_no in plain:
+            text = plain[page_no]
+        else:
+            text = transcribed[page_no]
+            # Fallback: if the vision model returned nothing (a weak/absent
+            # local model, or a page it could not read) but PyMuPDF recovered
+            # text on this page, keep that text so a text-bearing page still
+            # indexes instead of being dropped as empty downstream.
+            if not text and vision_fallback.get(page_no):
+                text = vision_fallback[page_no]
         result.append(Page(course=course, page=page_no, text=text, doc_type="slides"))
     return result

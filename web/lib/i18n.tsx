@@ -453,7 +453,8 @@ const en = {
   "doc.progress.skipped": "{count} already indexed",
   "doc.progress.done": "Done — {indexed} pages indexed.",
   "doc.progress.alreadyIndexed": "Already up to date — this document was already indexed (0 new pages).",
-  "doc.progress.empty": "Nothing indexed — no extractable content was found in this file.",
+  "doc.progress.empty":
+    "Nothing indexed — no text could be extracted. This file looks image-only (scanned pages or images), which the current extractor cannot read. Configure an OpenAI extract model (set LLM_EXTRACT) to index files like this.",
   "doc.progress.error": "Import failed: {message}",
   "doc.upToDate": "Up to date",
   "doc.viewFailed": "Could not open the file.",
@@ -929,7 +930,8 @@ const fr: Record<TranslationKey, string> = {
   "doc.progress.skipped": "{count} déjà indexées",
   "doc.progress.done": "Terminé — {indexed} pages indexées.",
   "doc.progress.alreadyIndexed": "Déjà à jour — ce document était déjà indexé (0 nouvelle page).",
-  "doc.progress.empty": "Rien indexé — aucun contenu exploitable trouvé dans ce fichier.",
+  "doc.progress.empty":
+    "Rien indexé — aucun texte n'a pu être extrait. Ce fichier semble ne contenir que des images (pages scannées ou images), que l'extracteur actuel ne peut pas lire. Configurez un modèle d'extraction OpenAI (définissez LLM_EXTRACT) pour indexer ce type de fichier.",
   "doc.progress.error": "Échec de l'import : {message}",
   "doc.upToDate": "À jour",
   "doc.viewFailed": "Impossible d'ouvrir le fichier.",
@@ -1385,7 +1387,8 @@ const nl: Record<TranslationKey, string> = {
   "doc.progress.skipped": "{count} al geïndexeerd",
   "doc.progress.done": "Klaar — {indexed} pagina's geïndexeerd.",
   "doc.progress.alreadyIndexed": "Al bijgewerkt — dit document was al geïndexeerd (0 nieuwe pagina's).",
-  "doc.progress.empty": "Niets geïndexeerd — geen bruikbare inhoud gevonden in dit bestand.",
+  "doc.progress.empty":
+    "Niets geïndexeerd — er kon geen tekst worden geëxtraheerd. Dit bestand lijkt alleen afbeeldingen te bevatten (gescande pagina's of afbeeldingen), die de huidige extractor niet kan lezen. Configureer een OpenAI-extractiemodel (stel LLM_EXTRACT in) om dit soort bestanden te indexeren.",
   "doc.progress.error": "Import mislukt: {message}",
   "doc.upToDate": "Bijgewerkt",
   "doc.viewFailed": "Kon het bestand niet openen.",

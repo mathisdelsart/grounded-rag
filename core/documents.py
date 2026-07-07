@@ -279,8 +279,12 @@ def _done_reason(indexed: int, skipped: int) -> str:
 
     - ``"indexed"``: new chunks were added this run.
     - ``"already_indexed"``: nothing new, but the document was already indexed.
-    - ``"empty"``: nothing new and nothing was there — the file had no
-      extractable content (blank/whitespace prose, or a text-less PDF).
+    - ``"empty"``: nothing new and nothing was there — no text could be
+      extracted. The file is blank/whitespace prose, or an image-only PDF the
+      current extractor cannot read (a weak/local vision model returned nothing
+      and PyMuPDF found no text). The UI maps this reason to a message that
+      suggests configuring an OpenAI extract model (``LLM_EXTRACT``) for such
+      image-only files.
     """
     if indexed > 0:
         return "indexed"
