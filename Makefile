@@ -7,7 +7,7 @@ SHELL := /bin/sh
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install local-install local qdrant hooks lint fmt fmt-check test check api ui web dev eval eval-report ingest ask up down clean reset-db
+.PHONY: help install local-install local qdrant hooks lint fmt fmt-check test check api ui web dev eval eval-report ingest ingest-prod ask up down clean reset-db
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Available targets:\n"} \
@@ -81,10 +81,18 @@ eval: ## Run the offline evaluation (faithfulness judge)
 eval-report: ## Run the eval and write eval/results.json (calls the API)
 	uv run python -m eval.run_eval --out eval/results.json
 
-# Ingest a PDF into Qdrant.
+# Ingest a PDF into the local Qdrant.
 # Usage: make ingest PDF=path/to/file.pdf COURSE="Course Name"
-ingest: ## Ingest a PDF (vars: PDF=..., COURSE="...")
+ingest: ## Ingest a PDF into local Qdrant (vars: PDF=..., COURSE="...")
 	uv run python -m ingestion.run $(PDF) --course "$(COURSE)"
+
+# Ingest a PDF into the PRODUCTION Qdrant Cloud, loading prod-only credentials
+# from .env.prod (gitignored, kept out of the repo). Deliberately separate from
+# `make ingest` (local) so a normal dev run can never write to prod by accident.
+# Usage: make ingest-prod PDF=path/to/file.pdf COURSE="Course Name"
+ingest-prod: ## Ingest a PDF into PROD Qdrant Cloud (loads .env.prod; vars: PDF=..., COURSE="...")
+	@test -f .env.prod || { echo "Error: .env.prod not found (create it with your Neon + Qdrant Cloud credentials)"; exit 1; }
+	set -a; . ./.env.prod; set +a; uv run --extra ingestion python -m ingestion.run "$(PDF)" --course "$(COURSE)"
 
 # Ask a question from the command line.
 # Usage: make ask Q="your question"
