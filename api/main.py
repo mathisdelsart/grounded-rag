@@ -16,6 +16,7 @@ Endpoints:
     GET  /documents         inventory of indexed material by course and chapter
     POST /documents/upload  ingest an uploaded file under a course/chapter
     DELETE /documents       delete a course's (or one chapter's) indexed points
+    POST /documents/rename  rename a course and/or a chapter of the caller's material
     GET  /source/{chunk_id} fetch a cited source chunk's text and metadata
     GET  /history/{id}      recent conversation turns for a student
     POST /sessions          open a named conversation thread for a student
@@ -88,6 +89,8 @@ from core.courses import list_chapters, list_courses
 from core.documents import (
     delete_documents,
     list_documents,
+    rename_chapter,
+    rename_course,
     save_upload,
     stored_file_path,
     stream_ingest,
@@ -727,6 +730,30 @@ class DocumentDeleteResponse(BaseModel):
     """How many indexed points were removed by a delete request."""
 
     deleted: int
+
+
+class DocumentRenameRequest(BaseModel):
+    """Rename a course and/or a chapter of the caller's indexed material.
+
+    ``student_id`` scopes the rename to the caller's own points (required — a
+    rename is a per-account write). ``course`` names the course to act on. Set
+    ``new_course`` to rename that course; set both ``chapter`` and ``new_chapter``
+    to rename a chapter within the course. At least one of the two renames must be
+    requested.
+    """
+
+    student_id: str
+    course: str
+    new_course: str | None = None
+    chapter: str | None = None
+    new_chapter: str | None = None
+
+
+class DocumentRenameResponse(BaseModel):
+    """How many indexed points a rename updated, split by field."""
+
+    course_updated: int = 0
+    chapter_updated: int = 0
 
 
 class SourceResponse(BaseModel):
@@ -1876,6 +1903,54 @@ def remove_documents(
             _resolve_student(session, student_id, user)
         owner = student_id
     return {"deleted": delete_documents(course, chapter, owner)}
+
+
+@app.post(
+    "/documents/rename",
+    response_model=DocumentRenameResponse,
+    dependencies=[Depends(require_api_key)],
+)
+def rename_documents(
+    request: DocumentRenameRequest,
+    user: UserOut | None = DataUser,
+) -> dict[str, int]:
+    """Rename a course and/or a chapter of the caller's indexed material.
+
+    Set ``new_course`` to rename ``course``; set both ``chapter`` and
+    ``new_chapter`` to rename that chapter within the course. Renaming rewrites the
+    ``course``/``chapter`` payload on the caller's matching chunks, so the new name
+    is reflected everywhere it is read (inventory, course/chapter pickers,
+    retrieval filters, citations). ``student_id`` is required so the rename is
+    stamped to and strictly scoped to that account's OWN points only (never another
+    account's material and never the owner-less legacy corpus); the student is
+    resolved and ownership enforced exactly as on upload/delete. Renaming onto an
+    existing course/chapter name merges into it, which is acceptable. When a chapter
+    rename is requested it is applied first (under the original course name) so a
+    combined course+chapter rename in one call stays consistent. Returns how many
+    points each field's rename updated; an unknown course/chapter or a no-op yields
+    zeros rather than an error. It never reaches the LLM and runs no retrieval.
+    """
+    with get_session(_engine) as session:
+        _resolve_student(session, request.student_id, user)
+    owner: str = request.student_id
+
+    if request.new_course is None and not (request.chapter and request.new_chapter):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide new_course, or both chapter and new_chapter.",
+        )
+
+    # Rename the chapter first (under the ORIGINAL course name) so a combined
+    # course+chapter rename in one call still matches; then rename the course.
+    chapter_updated = 0
+    if request.chapter and request.new_chapter:
+        chapter_updated = rename_chapter(
+            owner, request.course, request.chapter, request.new_chapter
+        )
+    course_updated = 0
+    if request.new_course is not None:
+        course_updated = rename_course(owner, request.course, request.new_course)
+    return {"course_updated": course_updated, "chapter_updated": chapter_updated}
 
 
 @app.get(

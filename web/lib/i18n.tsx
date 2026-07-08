@@ -493,6 +493,14 @@ const en = {
   "doc.viewFailed": "Could not open the file.",
   "doc.delete.confirmShort": "Delete?",
   "doc.delete.confirmYes": "Yes, delete",
+  "doc.rename.course": "Rename course",
+  "doc.rename.chapter": "Rename chapter",
+  "doc.rename.courseAria": "Rename course “{name}”",
+  "doc.rename.chapterAria": "Rename chapter “{name}”",
+  "doc.rename.save": "Save",
+  "doc.rename.cancel": "Cancel",
+  "doc.rename.success": "Renamed to “{name}”.",
+  "doc.rename.failed": "Could not rename. Please try again.",
 
   // Misc
   "common.loading": "Loading",
@@ -1003,6 +1011,14 @@ const fr: Record<TranslationKey, string> = {
   "doc.viewFailed": "Impossible d'ouvrir le fichier.",
   "doc.delete.confirmShort": "Supprimer ?",
   "doc.delete.confirmYes": "Oui, supprimer",
+  "doc.rename.course": "Renommer le cours",
+  "doc.rename.chapter": "Renommer le chapitre",
+  "doc.rename.courseAria": "Renommer le cours « {name} »",
+  "doc.rename.chapterAria": "Renommer le chapitre « {name} »",
+  "doc.rename.save": "Enregistrer",
+  "doc.rename.cancel": "Annuler",
+  "doc.rename.success": "Renommé en « {name} ».",
+  "doc.rename.failed": "Impossible de renommer. Veuillez réessayer.",
 
   // Misc
   "common.loading": "Chargement",
@@ -1493,6 +1509,14 @@ const nl: Record<TranslationKey, string> = {
   "doc.viewFailed": "Kon het bestand niet openen.",
   "doc.delete.confirmShort": "Verwijderen?",
   "doc.delete.confirmYes": "Ja, verwijderen",
+  "doc.rename.course": "Vak hernoemen",
+  "doc.rename.chapter": "Hoofdstuk hernoemen",
+  "doc.rename.courseAria": "Vak “{name}” hernoemen",
+  "doc.rename.chapterAria": "Hoofdstuk “{name}” hernoemen",
+  "doc.rename.save": "Opslaan",
+  "doc.rename.cancel": "Annuleren",
+  "doc.rename.success": "Hernoemd naar “{name}”.",
+  "doc.rename.failed": "Hernoemen mislukt. Probeer het opnieuw.",
 
   // Misc
   "common.loading": "Laden",

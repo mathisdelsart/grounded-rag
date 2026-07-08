@@ -14,6 +14,10 @@ client. It exposes three operations a "Documents" UI needs:
   names so a test can stub them without loading any model.
 - :func:`delete_documents` removes the points of a course (optionally narrowed to
   one chapter) with a payload filter, returning how many points were removed.
+- :func:`rename_course` / :func:`rename_chapter` rewrite the ``course`` /
+  ``chapter`` payload field on all of the caller's matching points with a
+  filtered ``set_payload``, so a rename is reflected everywhere (inventory,
+  pickers, retrieval filters, citations). Both are owner-scoped and fail-closed.
 
 The Qdrant client is built from settings, matching ``core.courses`` and
 ``core.sources``.
@@ -576,3 +580,114 @@ def delete_documents(course: str, chapter: str | None = None, owner: str | None 
     except Exception:
         return 0
     return matched
+
+
+def _set_payload_scoped(
+    owner: str,
+    course: str,
+    chapter: str | None,
+    payload: dict[str, Any],
+) -> int:
+    """Overwrite ``payload`` on the caller's points matching course(+chapter).
+
+    Builds a payload filter on ``course`` (plus ``chapter`` when given) nested
+    under the strict :func:`owner_scope_filter`, counts the matching points, then
+    rewrites the given fields on exactly those points with ``set_payload``. The
+    owner scope guarantees another account's OWNED points and the owner-less
+    legacy corpus never match, so a rename can only ever touch the caller's own
+    material — never a collection-wide update. Returns how many points were
+    updated; any error yields ``0`` rather than raising, so the endpoint degrades
+    gracefully. Callers guarantee ``owner`` is truthy (fail-closed happens above).
+    """
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+    from core.retrieval import owner_scope_filter
+
+    settings = get_settings()
+    client = _client()
+    collection = settings.qdrant_collection
+
+    conditions: list[Any] = [FieldCondition(key="course", match=MatchValue(value=course))]
+    if chapter is not None:
+        conditions.append(FieldCondition(key="chapter", match=MatchValue(value=chapter)))
+    # Strictly scope to the caller's own points: another account's OWNED points and
+    # the owner-less legacy corpus never match, so neither can be rewritten here.
+    conditions.append(owner_scope_filter(owner))
+    payload_filter = Filter(must=conditions)
+
+    try:
+        matched = client.count(
+            collection_name=collection, count_filter=payload_filter, exact=True
+        ).count
+        # ``points`` accepts a Filter directly: only points matching it are updated,
+        # never the whole collection.
+        client.set_payload(
+            collection_name=collection,
+            payload=payload,
+            points=payload_filter,
+        )
+    except Exception:
+        return 0
+    return matched
+
+
+def _move_course_dir(old_course: str, new_course: str) -> None:
+    """Best-effort rename of the on-disk upload folder so stored files follow.
+
+    Renaming the Qdrant payloads is what the app relies on; this keeps the stored
+    originals viewable under the new course name too. It is best-effort: it only
+    renames when the source exists and the destination does not (a merge into an
+    existing course leaves the files where they are), and never raises — a failure
+    here must not fail the payload rename that already succeeded.
+    """
+    try:
+        source = _course_dir(old_course)
+        dest = _course_dir(new_course)
+        if os.path.isdir(source) and not os.path.exists(dest):
+            os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
+            os.rename(source, dest)
+    except Exception:
+        pass
+
+
+def rename_course(owner: str | None, old_course: str, new_course: str) -> int:
+    """Rename a course on all of the caller's matching points; return the count.
+
+    Rewrites the ``course`` payload field from ``old_course`` to a trimmed
+    ``new_course`` on every one of the caller's own points for that course, so the
+    new name shows up everywhere it is read (inventory, course/chapter pickers,
+    retrieval filters, citations). Renaming onto an existing course name merges the
+    two — that is acceptable and intentional. Also best-effort renames the stored
+    upload folder so the originals stay viewable. When ``owner`` is falsy the
+    rename is **fail-closed**: it returns ``0`` without touching Qdrant, so a
+    request with no identity can never issue a collection-wide update. Returns
+    ``0`` too when either name is empty/whitespace or unchanged.
+    """
+    new = (new_course or "").strip()
+    # Fail closed: no owner -> touch nothing. Also skip empty/no-op renames.
+    if not owner or not old_course or not new or new == old_course:
+        return 0
+    updated = _set_payload_scoped(owner, old_course, None, {"course": new})
+    if updated:
+        _move_course_dir(old_course, new)
+    return updated
+
+
+def rename_chapter(owner: str | None, course: str, old_chapter: str, new_chapter: str) -> int:
+    """Rename a chapter within a course on the caller's matching points; return count.
+
+    Rewrites the ``chapter`` payload field from ``old_chapter`` to a trimmed
+    ``new_chapter`` on every one of the caller's own points for that
+    ``course``/``chapter``, so the new name shows up everywhere it is read. Merging
+    into an existing chapter of the same course is acceptable. When ``owner`` is
+    falsy the rename is **fail-closed**: it returns ``0`` without touching Qdrant.
+    Returns ``0`` too when the course, the old chapter or the new name is
+    empty/whitespace, or when the name is unchanged. The chapterless
+    ("Uncategorized") group has no chapter value to match and so cannot be renamed
+    here.
+    """
+    new = (new_chapter or "").strip()
+    # Fail closed: no owner -> touch nothing. Also skip empty/no-op renames.
+    if not owner or not course or not old_chapter or not new or new == old_chapter:
+        return 0
+    return _set_payload_scoped(owner, course, old_chapter, {"chapter": new})
