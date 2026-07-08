@@ -793,6 +793,154 @@ def test_delete_documents_only_removes_mine_when_mixed(monkeypatch):
     assert [p["owner"] for p in _FilterEvalClient.deleted] == ["uA"]
 
 
+# --- rename_course / rename_chapter: filtered set_payload --------------------
+
+
+class _SetPayloadClient:
+    """Records the count/set_payload filters and payload; returns a fixed count."""
+
+    last_count_filter = None
+    last_payload = None
+    last_points = None
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def count(self, *, collection_name, count_filter, exact):  # noqa: ARG002
+        type(self).last_count_filter = count_filter
+        return SimpleNamespace(count=3)
+
+    def set_payload(self, *, collection_name, payload, points):  # noqa: ARG002
+        type(self).last_payload = payload
+        type(self).last_points = points
+
+
+def test_rename_course_sets_payload_scoped_to_owner_and_course(monkeypatch):
+    from qdrant_client.models import Filter
+
+    _use_client(monkeypatch, _SetPayloadClient)
+    assert documents_mod.rename_course("uA", "Old", "New") == 3
+    assert _SetPayloadClient.last_payload == {"course": "New"}
+    conds = _SetPayloadClient.last_count_filter.must
+    # course condition + a strict owner sub-filter (a nested Filter whose single
+    # `must` condition is owner == mine), and no chapter condition.
+    assert len(conds) == 2
+    owner_filters = [c for c in conds if isinstance(c, Filter)]
+    assert len(owner_filters) == 1
+    assert owner_filters[0].should is None and len(owner_filters[0].must) == 1
+    assert owner_filters[0].must[0].key == "owner"
+    assert owner_filters[0].must[0].match.value == "uA"
+    # The update is scoped by that very filter, never a collection-wide set.
+    assert _SetPayloadClient.last_points is _SetPayloadClient.last_count_filter
+
+
+def test_rename_course_trims_new_name(monkeypatch):
+    _use_client(monkeypatch, _SetPayloadClient)
+    assert documents_mod.rename_course("uA", "Old", "  New  ") == 3
+    assert _SetPayloadClient.last_payload == {"course": "New"}
+
+
+def test_rename_chapter_sets_payload_scoped_to_owner_course_chapter(monkeypatch):
+    from qdrant_client.models import Filter
+
+    _use_client(monkeypatch, _SetPayloadClient)
+    assert documents_mod.rename_chapter("uA", "Course", "Old", "New") == 3
+    assert _SetPayloadClient.last_payload == {"chapter": "New"}
+    conds = _SetPayloadClient.last_count_filter.must
+    # course + chapter conditions + the strict owner sub-filter.
+    assert len(conds) == 3
+    field_keys = {c.key for c in conds if not isinstance(c, Filter)}
+    assert field_keys == {"course", "chapter"}
+    owner_filters = [c for c in conds if isinstance(c, Filter)]
+    assert len(owner_filters) == 1 and owner_filters[0].must[0].match.value == "uA"
+
+
+class _RenameBoomClient:
+    """A client that must never be touched (fail-closed / no-op assertions)."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def count(self, *args, **kwargs):  # noqa: ARG002
+        raise AssertionError("no Qdrant call must happen for a fail-closed/no-op rename")
+
+    def set_payload(self, *args, **kwargs):  # noqa: ARG002
+        raise AssertionError("no set_payload must happen for a fail-closed/no-op rename")
+
+
+def test_rename_course_fail_closed_without_owner(monkeypatch):
+    # No owner -> fail closed: rename nothing WITHOUT touching Qdrant (never a
+    # collection-wide payload update).
+    _use_client(monkeypatch, _RenameBoomClient)
+    assert documents_mod.rename_course(None, "Old", "New") == 0
+    assert documents_mod.rename_course("", "Old", "New") == 0
+
+
+def test_rename_chapter_fail_closed_without_owner(monkeypatch):
+    _use_client(monkeypatch, _RenameBoomClient)
+    assert documents_mod.rename_chapter(None, "Course", "Old", "New") == 0
+    assert documents_mod.rename_chapter("", "Course", "Old", "New") == 0
+
+
+def test_rename_course_noop_leaves_qdrant_untouched(monkeypatch):
+    # An empty/whitespace or unchanged new name is a no-op that never hits Qdrant.
+    _use_client(monkeypatch, _RenameBoomClient)
+    assert documents_mod.rename_course("uA", "Old", "   ") == 0
+    assert documents_mod.rename_course("uA", "Old", "Old") == 0
+
+
+def test_rename_chapter_noop_leaves_qdrant_untouched(monkeypatch):
+    _use_client(monkeypatch, _RenameBoomClient)
+    assert documents_mod.rename_chapter("uA", "Course", "Old", "  ") == 0
+    assert documents_mod.rename_chapter("uA", "Course", "Old", "Old") == 0
+    # The chapterless ("Uncategorized") group has no chapter value to match.
+    assert documents_mod.rename_chapter("uA", "Course", "", "New") == 0
+
+
+class _RenameEvalClient(_FilterEvalClient):
+    """Evaluates the rename filter against canned points to prove the scope."""
+
+    updated: list[dict] = []
+
+    def set_payload(self, *, collection_name, payload, points):  # noqa: ARG002
+        type(self).updated = self._matching(points)
+
+
+def test_rename_course_only_updates_mine_when_mixed(monkeypatch):
+    # A course shared (by name) across accounts: renaming as uA rewrites ONLY uA's
+    # points, never uB's OWNED points and never the owner-less legacy ones.
+    _RenameEvalClient.points = [
+        {"course": "Shared", "owner": "uA"},
+        {"course": "Shared", "owner": "uB"},
+        {"course": "Shared", "owner": None},
+    ]
+    _use_client(monkeypatch, _RenameEvalClient)
+    assert documents_mod.rename_course("uA", "Shared", "Renamed") == 1
+    assert [p["owner"] for p in _RenameEvalClient.updated] == ["uA"]
+
+
+def test_rename_course_leaves_another_accounts_owned_course(monkeypatch):
+    _RenameEvalClient.points = [
+        {"course": "Shared", "owner": "uB"},
+        {"course": "Shared", "owner": "uB"},
+    ]
+    _use_client(monkeypatch, _RenameEvalClient)
+    assert documents_mod.rename_course("uA", "Shared", "Renamed") == 0
+    assert _RenameEvalClient.updated == []
+
+
+def test_rename_documents_degrades_on_error(monkeypatch):
+    class _RaisingClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def count(self, **kwargs):  # noqa: ARG002
+            raise RuntimeError("missing collection")
+
+    _use_client(monkeypatch, _RaisingClient)
+    assert documents_mod.rename_course("uA", "Old", "New") == 0
+
+
 # --- /documents routes -------------------------------------------------------
 # Gated on the optional `api` extra (FastAPI). The core tests above always run.
 
@@ -1045,4 +1193,84 @@ def test_delete_route_returns_count(client, monkeypatch):
 @requires_api
 def test_delete_route_requires_course(client):
     response = client.delete("/documents")
+    assert response.status_code == 422
+
+
+@requires_api
+def test_rename_route_renames_course(client, monkeypatch):
+    seen: dict = {}
+
+    def fake_rename_course(owner, old, new):
+        seen["args"] = (owner, old, new)
+        return 4
+
+    monkeypatch.setattr(api_main, "rename_course", fake_rename_course)
+    response = client.post(
+        "/documents/rename",
+        json={"student_id": "uA", "course": "Old", "new_course": "New"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"course_updated": 4, "chapter_updated": 0}
+    assert seen["args"] == ("uA", "Old", "New")
+
+
+@requires_api
+def test_rename_route_renames_chapter(client, monkeypatch):
+    seen: dict = {}
+
+    def fake_rename_chapter(owner, course, old, new):
+        seen["args"] = (owner, course, old, new)
+        return 2
+
+    monkeypatch.setattr(api_main, "rename_chapter", fake_rename_chapter)
+    response = client.post(
+        "/documents/rename",
+        json={"student_id": "uA", "course": "C", "chapter": "Old", "new_chapter": "New"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"course_updated": 0, "chapter_updated": 2}
+    assert seen["args"] == ("uA", "C", "Old", "New")
+
+
+@requires_api
+def test_rename_route_renames_chapter_before_course(client, monkeypatch):
+    # A combined rename applies the chapter first (under the ORIGINAL course name)
+    # so the chapter filter still matches, then renames the course.
+    order: list[str] = []
+
+    def fake_rename_chapter(owner, course, old, new):  # noqa: ARG001
+        order.append("chapter")
+        return 1
+
+    def fake_rename_course(owner, old, new):  # noqa: ARG001
+        order.append("course")
+        return 2
+
+    monkeypatch.setattr(api_main, "rename_chapter", fake_rename_chapter)
+    monkeypatch.setattr(api_main, "rename_course", fake_rename_course)
+    response = client.post(
+        "/documents/rename",
+        json={
+            "student_id": "uA",
+            "course": "C",
+            "chapter": "Old",
+            "new_chapter": "NewCh",
+            "new_course": "NewC",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {"course_updated": 2, "chapter_updated": 1}
+    assert order == ["chapter", "course"]
+
+
+@requires_api
+def test_rename_route_requires_a_rename(client):
+    # Neither a course rename nor a full chapter rename requested -> 400.
+    response = client.post("/documents/rename", json={"student_id": "uA", "course": "C"})
+    assert response.status_code == 400
+
+
+@requires_api
+def test_rename_route_requires_student_id(client):
+    response = client.post("/documents/rename", json={"course": "C", "new_course": "N"})
     assert response.status_code == 422

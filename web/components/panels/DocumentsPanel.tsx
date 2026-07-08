@@ -7,6 +7,8 @@ import {
   fetchDocumentFile,
   getJob,
   listDocuments,
+  renameChapter,
+  renameCourse,
   startUpload,
   type ConnectionConfig,
   type DocumentCourse,
@@ -277,6 +279,34 @@ export function DocumentsPanel({
     } finally {
       setDeleting(null);
     }
+  }
+
+  // Rename a course: rewrite the payload on the caller's chunks, then refresh the
+  // inventory and let the parent refresh its course/chapter pickers. Rethrows so
+  // the inline editor keeps the field open for a retry on failure.
+  async function saveCourseRename(oldName: string, newName: string) {
+    try {
+      await renameCourse(oldName, newName, config, studentId);
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : t("doc.rename.failed"), "error");
+      throw err;
+    }
+    toast.push(t("doc.rename.success", { name: newName }), "success");
+    await load();
+    onCoursesChanged?.();
+  }
+
+  // Rename a chapter within a course; same refresh + error handling as above.
+  async function saveChapterRename(courseName: string, oldName: string, newName: string) {
+    try {
+      await renameChapter(courseName, oldName, newName, config, studentId);
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : t("doc.rename.failed"), "error");
+      throw err;
+    }
+    toast.push(t("doc.rename.success", { name: newName }), "success");
+    await load();
+    onCoursesChanged?.();
   }
 
   /** Delete affordance: a neutral button that flips to a red confirm/cancel pair. */
@@ -564,8 +594,14 @@ export function DocumentsPanel({
                   className="space-y-3 rounded-lg border border-zinc-100 bg-zinc-50/60 p-4"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-zinc-900">{courseItem.course}</p>
+                    <div className="min-w-0">
+                      <InlineRename
+                        value={courseItem.course}
+                        ariaLabel={t("doc.rename.courseAria", { name: courseItem.course })}
+                        editLabel={t("doc.rename.course")}
+                        labelClassName="text-sm font-semibold text-zinc-900"
+                        onSave={(next) => saveCourseRename(courseItem.course, next)}
+                      />
                       <p className="text-xs text-zinc-500">
                         {t("doc.pageCount", { count: courseItem.total_pages })}
                       </p>
@@ -597,7 +633,19 @@ export function DocumentsPanel({
                         key={rowKey(courseItem.course, ch.chapter)}
                         className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
                       >
-                        <span className="text-zinc-700">{ch.chapter ?? t("doc.uncategorized")}</span>
+                        {ch.chapter ? (
+                          <InlineRename
+                            value={ch.chapter}
+                            ariaLabel={t("doc.rename.chapterAria", { name: ch.chapter })}
+                            editLabel={t("doc.rename.chapter")}
+                            labelClassName="text-zinc-700"
+                            onSave={(next) =>
+                              saveChapterRename(courseItem.course, ch.chapter as string, next)
+                            }
+                          />
+                        ) : (
+                          <span className="text-zinc-700">{t("doc.uncategorized")}</span>
+                        )}
                         <div className="flex items-center gap-3">
                           <span className="text-xs tabular-nums text-zinc-500">
                             {t("doc.pageCount", { count: ch.pages })}
@@ -614,6 +662,122 @@ export function DocumentsPanel({
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/**
+ * Inline rename affordance: a label with a pencil button that turns into a text
+ * input with save/cancel. Enter confirms, Escape cancels; the input is focused
+ * and its text selected when editing opens. `onSave` receives the trimmed new
+ * value; a no-op or empty value just closes the editor, and a thrown error keeps
+ * the editor open so the user can retry (the caller surfaces the error toast).
+ */
+function InlineRename({
+  value,
+  ariaLabel,
+  editLabel,
+  labelClassName,
+  onSave,
+}: {
+  value: string;
+  ariaLabel: string;
+  editLabel: string;
+  labelClassName?: string;
+  onSave: (next: string) => Promise<void>;
+}) {
+  const { t } = useT();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    setDraft(value);
+    // Focus and select on the next frame, once the input is mounted.
+    const id = requestAnimationFrame(() => inputRef.current?.select());
+    return () => cancelAnimationFrame(id);
+  }, [editing, value]);
+
+  async function commit() {
+    const next = draft.trim();
+    if (!next || next === value) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(next);
+      setEditing(false);
+    } catch {
+      // Keep the editor open for a retry; the caller already surfaced the error.
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className={cn("truncate", labelClassName)}>{value}</span>
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          title={editLabel}
+          onClick={() => setEditing(true)}
+          className="shrink-0 rounded p-1 text-zinc-400 transition-colors hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          <PencilIcon />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <input
+        ref={inputRef}
+        value={draft}
+        disabled={saving}
+        aria-label={ariaLabel}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setEditing(false);
+          }
+        }}
+        className={cn(baseField, "h-8 min-w-0 flex-1 py-1 text-sm")}
+      />
+      <button
+        type="button"
+        onClick={commit}
+        disabled={saving}
+        className="shrink-0 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-600 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+      >
+        {t("doc.rename.save")}
+      </button>
+      <button
+        type="button"
+        onClick={() => setEditing(false)}
+        disabled={saving}
+        className="shrink-0 rounded px-1.5 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-800 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      >
+        {t("doc.rename.cancel")}
+      </button>
+    </span>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   );
 }
 

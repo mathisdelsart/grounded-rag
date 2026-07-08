@@ -1094,6 +1094,12 @@ export interface DocumentDeleteResult {
   deleted: number;
 }
 
+/** How many indexed points a rename updated, split by field. */
+export interface DocumentRenameResult {
+  course_updated: number;
+  chapter_updated: number;
+}
+
 /**
  * List the indexed material organized by course and chapter. Empty when none.
  * When `studentId` is given the inventory is scoped to that account's own
@@ -1196,6 +1202,56 @@ export async function deleteDocument(
   return request<DocumentDeleteResult>(
     `/documents?${params.toString()}`,
     { method: "DELETE", headers: buildHeaders(config) },
+    config,
+  );
+}
+
+/**
+ * Rename a course on all of the caller's indexed chunks. The new name is
+ * reflected everywhere it is read (inventory, course/chapter pickers, retrieval
+ * filters, citations). `studentId` scopes the rename to that account's OWN
+ * points only.
+ */
+export async function renameCourse(
+  course: string,
+  newCourse: string,
+  config: ConnectionConfig | undefined,
+  studentId: string,
+): Promise<DocumentRenameResult> {
+  return request<DocumentRenameResult>(
+    "/documents/rename",
+    {
+      method: "POST",
+      headers: buildHeaders(config, true),
+      body: JSON.stringify({ student_id: studentId, course, new_course: newCourse }),
+    },
+    config,
+  );
+}
+
+/**
+ * Rename a chapter within a course on the caller's indexed chunks. `studentId`
+ * scopes the rename to that account's OWN points only.
+ */
+export async function renameChapter(
+  course: string,
+  chapter: string,
+  newChapter: string,
+  config: ConnectionConfig | undefined,
+  studentId: string,
+): Promise<DocumentRenameResult> {
+  return request<DocumentRenameResult>(
+    "/documents/rename",
+    {
+      method: "POST",
+      headers: buildHeaders(config, true),
+      body: JSON.stringify({
+        student_id: studentId,
+        course,
+        chapter,
+        new_chapter: newChapter,
+      }),
+    },
     config,
   );
 }
