@@ -234,6 +234,19 @@ function resolveOpenaiKey(config?: ConnectionConfig): string {
   return (config?.openaiKey ?? "").trim();
 }
 
+/**
+ * Normalize a pasted API key. Users often copy a whole line from a `.env` file
+ * or a shell export, e.g. `export OPENAI_API_KEY="sk-..."` — strip a leading
+ * `export `, a `NAME=` assignment prefix, surrounding quotes, and whitespace so
+ * only the key itself is kept. A bare key (`sk-...`, `sk-ant-...`) is returned
+ * unchanged (it has no leading `identifier=`).
+ */
+export function normalizeApiKey(raw: string): string {
+  let key = raw.trim().replace(/^export\s+/i, "");
+  key = key.replace(/^[A-Za-z_][A-Za-z0-9_]*\s*=\s*/, "");
+  return key.trim().replace(/^["']|["']$/g, "").trim();
+}
+
 function buildHeaders(config?: ConnectionConfig, json = false): Headers {
   const headers = new Headers();
   if (json) {

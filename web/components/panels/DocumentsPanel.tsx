@@ -207,18 +207,19 @@ export function DocumentsPanel({
     };
   }, [activeJob, config, load, onCoursesChanged]);
 
-  // Live elapsed clock: while an upload is running, anchor a monotonic start
-  // timestamp and tick every second, so the elapsed time counts up smoothly on
-  // its own (the SSE `elapsed` only updates per processed page, in jumps).
+  // Live elapsed clock. Anchor to the SERVER-reported elapsed (the job keeps
+  // running server-side), so a page refresh mid-import shows the REAL elapsed and
+  // keeps counting instead of restarting from 0. Between the per-batch server
+  // updates it ticks smoothly on its own; each new server `elapsed` re-anchors it.
   useEffect(() => {
     if (!uploading) return;
-    const start = performance.now();
-    setLiveElapsed(0);
-    const id = window.setInterval(() => {
-      setLiveElapsed((performance.now() - start) / 1000);
-    }, 1000);
+    const serverElapsed = progress?.elapsed ?? 0;
+    const anchor = performance.now() - serverElapsed * 1000;
+    const tick = () => setLiveElapsed(Math.max(serverElapsed, (performance.now() - anchor) / 1000));
+    tick();
+    const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [uploading]);
+  }, [uploading, progress?.elapsed]);
 
   async function upload() {
     if (!file || !course.trim() || uploading) return;

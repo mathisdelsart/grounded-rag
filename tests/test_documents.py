@@ -103,6 +103,15 @@ def test_jobs_prune_drops_stale_finished_jobs(jobs_db):
     assert jobs_mod.get_job(new_id) is not None
 
 
+def test_openai_key_error_distinguishes_missing_vs_rejected():
+    # No key supplied -> "add your key"; a key WAS supplied but rejected -> "the
+    # key was rejected", so a user who pasted a bad/malformed key is not told to
+    # add one they already added.
+    assert documents_mod._openai_key_error(None) == documents_mod.MISSING_OPENAI_KEY_MESSAGE
+    assert documents_mod._openai_key_error("") == documents_mod.MISSING_OPENAI_KEY_MESSAGE
+    assert documents_mod._openai_key_error("sk-bad") == documents_mod.REJECTED_OPENAI_KEY_MESSAGE
+
+
 # --- list_documents: grouping by course and chapter --------------------------
 
 
