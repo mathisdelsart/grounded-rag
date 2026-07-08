@@ -58,6 +58,20 @@ MISSING_OPENAI_KEY_MESSAGE = (
     "import for free without a key."
 )
 
+# Same failure but the visitor DID supply a key that the provider rejected (wrong
+# value, no credit, or no vision-model access). A common cause is pasting a whole
+# `OPENAI_API_KEY=...` line instead of just the key, so the message says so.
+REJECTED_OPENAI_KEY_MESSAGE = (
+    "The API key was rejected. Check that it is valid — that it has credit and "
+    "access to a vision model, and that you pasted only the key itself (e.g. "
+    "sk-…), not a whole 'OPENAI_API_KEY=…' line."
+)
+
+
+def _openai_key_error(extract_api_key: str | None) -> str:
+    """Pick the missing-key vs rejected-key message by whether a key was supplied."""
+    return REJECTED_OPENAI_KEY_MESSAGE if extract_api_key else MISSING_OPENAI_KEY_MESSAGE
+
 
 def _is_missing_openai_credentials(exc: BaseException) -> bool:
     """Return whether ``exc`` is an OpenAI missing/invalid-credentials error.
@@ -318,7 +332,7 @@ def _load_pages(path: str, course: str, *, extract_api_key: str | None = None) -
         # A missing/invalid OpenAI key on a scanned PDF surfaces as a clear,
         # actionable message instead of a raw SDK error.
         if _is_missing_openai_credentials(exc):
-            raise ValueError(MISSING_OPENAI_KEY_MESSAGE) from exc
+            raise ValueError(_openai_key_error(extract_api_key)) from exc
         # A corrupt/unreadable PDF (fitz.open failure) surfaces as a clean error
         # rather than an opaque low-level exception.
         raise ValueError(f"Could not read the PDF: {exc}") from exc
@@ -530,7 +544,9 @@ def stream_ingest(
     except Exception as exc:
         # A scanned/image PDF with no OpenAI key (visitor's or env) surfaces as a
         # clear, actionable message so the UI can guide the user to add their key.
-        message = MISSING_OPENAI_KEY_MESSAGE if _is_missing_openai_credentials(exc) else str(exc)
+        message = (
+            _openai_key_error(extract_api_key) if _is_missing_openai_credentials(exc) else str(exc)
+        )
         yield {
             "type": "error",
             "message": message,

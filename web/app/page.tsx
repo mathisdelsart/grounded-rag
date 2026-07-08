@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { me, type AskResponse, type ConnectionConfig } from "@/lib/api";
+import { me, normalizeApiKey, type AskResponse, type ConnectionConfig } from "@/lib/api";
 import { KEYS, generateStudentId, readLocal, writeLocal } from "@/lib/storage";
 import { Tabs, type TabItem } from "@/components/Tabs";
 import { HealthBadge } from "@/components/HealthBadge";
@@ -119,13 +119,15 @@ export default function Home() {
     [baseUrl, apiKey, token, openaiKey],
   );
 
-  // Update the visitor's own OpenAI key (from the account menu or the Documents
-  // upload card) and persist it so it survives reloads and stays in sync across
-  // both places. Trimmed on write so a blank value clears it.
+  // Update the visitor's own OpenAI/Anthropic key (from the account menu or the
+  // Documents upload card) and persist it so it survives reloads and stays in
+  // sync across both places. The value is normalized so a paste like
+  // `OPENAI_API_KEY="sk-..."` (a common copy from a .env or shell export) still
+  // yields just the key; a blank value clears it.
   function updateOpenaiKey(next: string) {
-    const trimmed = next.trim();
-    setOpenaiKey(trimmed);
-    writeLocal(KEYS.openaiKey, trimmed);
+    const cleaned = normalizeApiKey(next);
+    setOpenaiKey(cleaned);
+    writeLocal(KEYS.openaiKey, cleaned);
   }
 
   // Resolve the signed-in user's id whenever a token exists, so being logged in
