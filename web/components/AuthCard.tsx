@@ -48,8 +48,15 @@ export function AuthCard({ config, onLogin, onSuccess, onClose, className }: Aut
   const canSubmit = usernameInput.trim().length > 0 && password.length > 0 && !loading;
 
   function switchMode(next: Mode) {
+    if (next === mode) return;
     setMode(next);
     setError(null);
+    // Start the other form clean: keeping the typed username/password when
+    // toggling login <-> register feels wrong (e.g. a login attempt's values
+    // bleeding into the register form), so reset the fields on every switch.
+    setUsernameInput("");
+    setPassword("");
+    setShowPassword(false);
   }
 
   async function submit() {

@@ -196,6 +196,11 @@ export default function Home() {
     setAuthUsername(nextUsername);
     writeLocal(KEYS.authToken, nextToken);
     writeLocal(KEYS.authUsername, nextUsername);
+    // An explicit sign-in / register starts a fresh session: drop any OpenAI key
+    // left in this browser so a new account never inherits a previous visitor's
+    // key. It survives a plain reload (this only runs on a real login action, not
+    // on the silent token-resolve), so the current account keeps its own key.
+    updateOpenaiKey("");
   }
 
   function onLogout() {
@@ -236,8 +241,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Primary nav — smooth-scrolls to the landing sections (desktop only). */}
-          <nav aria-label={t("footer.explore")} className="hidden items-center gap-8 md:flex">
+          {/* Primary nav — smooth-scrolls to the landing sections. Shown only on
+              lg+ (where the longer FR/NL labels fit) and each label kept on a
+              single line so nothing wraps to two rows in the header. */}
+          <nav aria-label={t("footer.explore")} className="hidden items-center gap-6 lg:flex">
             {(
               [
                 ["how", "footer.link.how"],
@@ -249,7 +256,7 @@ export default function Home() {
                 key={target}
                 type="button"
                 onClick={() => scrollToId(target)}
-                className="rounded text-sm font-medium text-zinc-600 transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                className="whitespace-nowrap rounded text-sm font-medium text-zinc-600 transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
               >
                 {t(key)}
               </button>
@@ -259,11 +266,13 @@ export default function Home() {
           {/* Language + sign-in are direct flex children, so `justify-between`
               spreads logo · nav · language · sign-in with equal gaps between
               each — generous breathing room on both sides of the language. */}
-          {/* When a personal OpenAI key is set, show a discreet badge so it is
-              obvious the free model is replaced by a premium one everywhere. */}
-          {openaiKey && (
+          {/* When a signed-in visitor has set their own key, show a discreet badge
+              so it is obvious the free model is replaced by a premium one
+              everywhere. Gated on `token` so it never appears while signed out
+              (premium is a per-account thing); kept on one line so it never wraps. */}
+          {token && openaiKey && (
             <span
-              className="hidden items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-flex dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
+              className="hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 sm:inline-flex dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"
               title={t("settings.openaiKey.badgeTitle")}
             >
               <svg
