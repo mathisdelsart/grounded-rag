@@ -1,5 +1,8 @@
 # Secrets & personal data
 .env
+.env.*
+!.env.example
+/scratchpad/
 data/
 *.db
 *.local.md
