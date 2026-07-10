@@ -31,6 +31,19 @@ _SYSTEM = (
     "and reward any correct method and the course's notation.\n"
     "- Be encouraging: flag real errors and genuine gaps, not accessory "
     "differences in wording, ordering or notation.\n"
+    "- Read the student's answer carefully before listing anything to fix. Only "
+    "list something under 'What to fix or add' if the student's answer genuinely "
+    "gets it wrong or genuinely omits something the question asked for. NEVER "
+    "ask for something the answer already contains, and never restate a value or "
+    "step the student already gave correctly as if it were an error or an "
+    "improvement. A critique that merely repeats the student's own correct work "
+    "in different words is not allowed.\n"
+    "- If the answer is fully correct and complete, say so plainly: put a short "
+    "confirmation under 'What to fix or add' (e.g. 'Nothing to fix — the answer "
+    "is complete and correct.') and award full or near-full credit. Do not "
+    "manufacture criticism to look thorough.\n"
+    "- Keep your Model answer internally consistent: do not state a relationship "
+    "or value one way and then restate it inverted or differently.\n"
     "- Write the whole correction in the SAME LANGUAGE as the student's answer.\n"
     "\n"
     "Reply in EXACTLY this format and nothing else:\n"
@@ -83,6 +96,26 @@ _RIGOR_GUIDANCE: dict[Rigor, str] = {
 # the colon) does not match here and instead falls through to the JSON branch.
 _SCORE_RE = re.compile(r"score\s*:\s*(-?\d+)", re.IGNORECASE)
 
+# A "**Heading** —" section marker (a bold span followed by a dash). Matched
+# regardless of the heading's language so the three sections each begin their
+# own paragraph. Any whitespace already before the marker is consumed so the
+# rewrite never accumulates blank lines across repeated grading.
+_SECTION_RE = re.compile(r"[ \t]*\n?[ \t]*(\*\*[^*\n]+\*\*[ \t]*[—–-])")
+
+
+def _paragraphize_sections(feedback: str) -> str:
+    """Put each ``**Heading** —`` section on its own paragraph.
+
+    Markdown collapses single newlines, so the three bold section headings the
+    grader emits would otherwise render run together inline. Insert a blank line
+    before each heading (except a leading one) so they render as separate blocks,
+    keying on the ``**...** —`` shape rather than the heading text so it works in
+    any language.
+    """
+    spaced = _SECTION_RE.sub(r"\n\n\1", feedback).strip()
+    # Collapse any run of 3+ newlines the substitution may have created.
+    return re.sub(r"\n{3,}", "\n\n", spaced)
+
 
 def _clamp(value: object) -> int:
     """Clamp a model-supplied score to the documented 0-100 range."""
@@ -110,7 +143,10 @@ def _parse(raw: str) -> dict:
         else:
             feedback = text[score_match.end() :].strip()
         if feedback:
-            return {"score": _clamp(score_match.group(1)), "feedback": feedback}
+            return {
+                "score": _clamp(score_match.group(1)),
+                "feedback": _paragraphize_sections(feedback),
+            }
 
     # Fallback: a legacy JSON verdict, tolerating extra surrounding text.
     match = re.search(r"\{.*\}", text, re.DOTALL)

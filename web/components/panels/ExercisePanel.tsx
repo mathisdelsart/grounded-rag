@@ -96,6 +96,12 @@ export function ExercisePanel({
   async function run() {
     if (!canGenerate) return;
     setLoading(true);
+    // Clear the previous exercise's answer and verdict up front, so the stale
+    // answer box and correction disappear the moment a new exercise is
+    // requested rather than lingering on screen until generation finishes.
+    setLastExercise(null);
+    setAnswer("");
+    setResult(null);
     try {
       const generated = await exercise(
         studentId,
@@ -108,9 +114,6 @@ export function ExercisePanel({
         locale,
       );
       setLastExercise(generated);
-      // A fresh exercise invalidates any answer/verdict from the previous one.
-      setAnswer("");
-      setResult(null);
     } catch (err) {
       toast.push(err instanceof Error ? err.message : t("common.requestFailed"), "error");
     } finally {

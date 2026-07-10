@@ -367,6 +367,25 @@ def test_grade_node_parses_detailed_score_markdown_format(fake_llm):
     assert "---" not in out["grade"]["feedback"]
 
 
+def test_grade_node_separates_run_together_section_headings(fake_llm):
+    # When the model emits the three bold headings inline on one line, they must
+    # be split onto their own paragraphs so they do not render run together.
+    fake_llm["reply"] = (
+        "SCORE: 90\n"
+        "---\n"
+        "**What you got right** — the calculation. "
+        "**What to fix or add** — nothing to fix. "
+        "**Model answer** — the reference answer."
+    )
+    out = grade({"message": "my answer"})
+    feedback = out["grade"]["feedback"]
+    # Each heading starts its own paragraph (blank line before the 2nd and 3rd).
+    assert "\n\n**What to fix or add**" in feedback
+    assert "\n\n**Model answer**" in feedback
+    # No run of 3+ newlines is introduced.
+    assert "\n\n\n" not in feedback
+
+
 def test_grade_node_clamps_score_in_detailed_format(fake_llm):
     fake_llm["reply"] = "SCORE: 250\n---\nGreat work overall."
     out = grade({"message": "my answer"})
