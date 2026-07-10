@@ -31,6 +31,7 @@ from typing import Any
 
 from core import storage
 from core.config import get_settings
+from core.errors import describe_capacity_error
 from ingestion.chunk import chunk_pages
 from ingestion.index import index_chunks
 from ingestion.load import is_text_file, load_text_file
@@ -611,9 +612,12 @@ def stream_ingest(
             }
     except Exception as exc:
         # A scanned/image PDF with no OpenAI key (visitor's or env) surfaces as a
-        # clear, actionable message so the UI can guide the user to add their key.
+        # clear, actionable message so the UI can guide the user to add their key;
+        # a provider capacity error (free-tier TPM limit / rate limit) does too.
         message = (
-            _openai_key_error(extract_api_key) if _is_missing_openai_credentials(exc) else str(exc)
+            _openai_key_error(extract_api_key)
+            if _is_missing_openai_credentials(exc)
+            else describe_capacity_error(exc, used_own_key=bool(extract_api_key)) or str(exc)
         )
         yield {
             "type": "error",

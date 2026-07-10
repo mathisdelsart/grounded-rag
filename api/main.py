@@ -96,6 +96,7 @@ from core.documents import (
     save_upload,
     stream_ingest,
 )
+from core.errors import describe_capacity_error, raise_friendly_llm_error
 from core.jobs import (
     create_answer_job,
     create_job,
@@ -1039,15 +1040,19 @@ def ask(
     # persist the turn; by then the student is owned, so that call is a no-op.
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
-    result = answer(
-        request.question,
-        k=request.k,
-        course=request.course,
-        chapter=request.chapter,
-        owner=request.student_id,
-        language=request.language,
-        api_key=openai_key,
-    )
+    try:
+        result = answer(
+            request.question,
+            k=request.k,
+            course=request.course,
+            chapter=request.chapter,
+            owner=request.student_id,
+            language=request.language,
+            api_key=openai_key,
+        )
+    except Exception as exc:
+        raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
+        raise
     with get_session(_engine) as session:
         student = _resolve_student(session, request.student_id, user)
         thread_id = _resolve_session_id(session, student.id, request.session_id)
@@ -1087,30 +1092,35 @@ def _stream_ask_events(
     and never stored or logged.
     """
     final_answer = REFUSAL_FALLBACK
-    for event in stream_answer(
-        request.question,
-        k=request.k,
-        course=request.course,
-        chapter=request.chapter,
-        owner=request.student_id,
-        language=request.language,
-        api_key=openai_key,
-    ):
-        if event.get("type") == "sources":
-            final_answer = event.get("answer", final_answer)
-            payload = {
-                "type": "sources",
-                "sources": event.get("sources", []),
-                "citations": event.get("citations", []),
-                "refused": event.get("refused", False),
-                # Forward the cleaned final answer so the client can replace the
-                # raw token buffer (which may still show a trailing refusal the
-                # model wrongly appended) with the server-cleaned text.
-                "answer": final_answer,
-            }
-            yield f"data: {json.dumps(payload)}\n\n"
-        else:
-            yield f"data: {json.dumps(event)}\n\n"
+    try:
+        for event in stream_answer(
+            request.question,
+            k=request.k,
+            course=request.course,
+            chapter=request.chapter,
+            owner=request.student_id,
+            language=request.language,
+            api_key=openai_key,
+        ):
+            if event.get("type") == "sources":
+                final_answer = event.get("answer", final_answer)
+                payload = {
+                    "type": "sources",
+                    "sources": event.get("sources", []),
+                    "citations": event.get("citations", []),
+                    "refused": event.get("refused", False),
+                    # Forward the cleaned final answer so the client can replace the
+                    # raw token buffer (which may still show a trailing refusal the
+                    # model wrongly appended) with the server-cleaned text.
+                    "answer": final_answer,
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+            else:
+                yield f"data: {json.dumps(event)}\n\n"
+    except Exception as exc:
+        message = describe_capacity_error(exc, used_own_key=bool(openai_key)) or str(exc)
+        yield f"data: {json.dumps({'type': 'error', 'message': message})}\n\n"
+        return
 
     with get_session(_engine) as session:
         student = _resolve_student(session, request.student_id, user)
@@ -1236,7 +1246,8 @@ def _run_answer_job(
             },
         )
     except Exception as exc:  # pragma: no cover - defensive; answer guards itself
-        update_job(job_id, {"status": "error", "message": str(exc)})
+        message = describe_capacity_error(exc, used_own_key=bool(openai_key)) or str(exc)
+        update_job(job_id, {"status": "error", "message": message})
 
 
 @app.post(
@@ -1331,7 +1342,11 @@ def reexplain_answer(
             "history": history,
             "api_key": openai_key,
         }
-        rephrased = reexplain(state).get("answer", "")
+        try:
+            rephrased = reexplain(state).get("answer", "")
+        except Exception as exc:
+            raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
+            raise
         add_message(session, student_id=student.id, role="assistant", content=rephrased)
     return {"answer": rephrased}
 
@@ -1379,10 +1394,15 @@ def _stream_reexplain_events(
         return
 
     final_answer = ""
-    for event in stream_reexplain(state):
-        if event.get("type") == "done":
-            final_answer = event.get("answer", "")
-        yield f"data: {json.dumps(event)}\n\n"
+    try:
+        for event in stream_reexplain(state):
+            if event.get("type") == "done":
+                final_answer = event.get("answer", "")
+            yield f"data: {json.dumps(event)}\n\n"
+    except Exception as exc:
+        message = describe_capacity_error(exc, used_own_key=bool(openai_key)) or str(exc)
+        yield f"data: {json.dumps({'type': 'error', 'message': message})}\n\n"
+        return
 
     with get_session(_engine) as session:
         student = session.scalar(select(Student).where(Student.external_id == request.student_id))
@@ -1423,16 +1443,20 @@ def exercise(
     """
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
-    state = generate(
-        {
-            "message": request.notion,
-            "student_id": request.student_id,
-            "course": request.course,
-            "chapter": request.chapter,
-            "language": request.language,
-            "api_key": openai_key,
-        }
-    )
+    try:
+        state = generate(
+            {
+                "message": request.notion,
+                "student_id": request.student_id,
+                "course": request.course,
+                "chapter": request.chapter,
+                "language": request.language,
+                "api_key": openai_key,
+            }
+        )
+    except Exception as exc:
+        raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
+        raise
     # generate always populates "exercise" (a built exercise or a refusal).
     built = state.get("exercise")
     assert built is not None
@@ -1475,8 +1499,12 @@ def grade_answer(
     }
     if request.exercise is not None:
         state["exercise"] = request.exercise
+    try:
+        verdict = grade(state).get("grade")
+    except Exception as exc:
+        raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
+        raise
     # grade always populates "grade" with the judge's verdict.
-    verdict = grade(state).get("grade")
     assert verdict is not None
     return {"score": verdict["score"], "feedback": verdict["feedback"]}
 
@@ -1498,15 +1526,19 @@ def quiz(
     """
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
-    result = generate_quiz(
-        request.notion,
-        request.n,
-        request.student_id,
-        course=request.course,
-        chapter=request.chapter,
-        language=request.language,
-        api_key=openai_key,
-    )
+    try:
+        result = generate_quiz(
+            request.notion,
+            request.n,
+            request.student_id,
+            course=request.course,
+            chapter=request.chapter,
+            language=request.language,
+            api_key=openai_key,
+        )
+    except Exception as exc:
+        raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
+        raise
     # Record a concise activity turn (the notion + question count), never the full
     # quiz JSON. Skip on refusal: an uncovered notion produces no questions.
     if not result["refused"] and result["questions"]:
@@ -1544,9 +1576,18 @@ def quiz_grade(
     """
     with get_session(_engine) as session:
         _resolve_student(session, request.student_id, user)
-    verdict = grade_quiz_answer(
-        quiz_id, request.question_id, request.answer, request.student_id, request.rigor, openai_key
-    )
+    try:
+        verdict = grade_quiz_answer(
+            quiz_id,
+            request.question_id,
+            request.answer,
+            request.student_id,
+            request.rigor,
+            openai_key,
+        )
+    except Exception as exc:
+        raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
+        raise
     if verdict is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1840,7 +1881,8 @@ async def upload_document(
                     return
             update_job(job_id, {"status": "done"})
         except Exception as exc:  # pragma: no cover - defensive; ingest guards itself
-            update_job(job_id, {"status": "error", "type": "error", "message": str(exc)})
+            message = describe_capacity_error(exc, used_own_key=bool(extract_api_key)) or str(exc)
+            update_job(job_id, {"status": "error", "type": "error", "message": message})
 
     threading.Thread(target=run, daemon=True).start()
     return {"job_id": job_id}
