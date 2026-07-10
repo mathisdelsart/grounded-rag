@@ -140,6 +140,26 @@ def test_ask_uses_default_k(client, monkeypatch):
     assert captured["k"] == 5
 
 
+def test_ask_surfaces_friendly_message_on_free_tier_capacity_error(client, monkeypatch):
+    class _StatusError(Exception):
+        def __init__(self):
+            super().__init__("Error code: 413 - {'error': {'code': 'rate_limit_exceeded'}}")
+            self.status_code = 413
+
+    def fake_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        raise _StatusError()
+
+    monkeypatch.setattr(api_main, "answer", fake_answer)
+
+    response = client.post("/ask", json={"student_id": "s1", "question": "A huge question " * 200})
+    assert response.status_code == 413
+    # The raw provider error never reaches the client; a clear, actionable
+    # message pointing at the account's own-key option does.
+    assert "own OpenAI or Anthropic API key" in response.json()["detail"]
+
+
 def test_ask_surfaces_refusal(client, monkeypatch):
     def fake_answer(
         question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
@@ -636,6 +656,28 @@ def test_ask_async_returns_job_and_reaches_done(client, monkeypatch):
     assert job["sources"] == ["(Course, p.11)"]
     assert job["citations"] == [{"n": 1, "id": "c1", "label": "(Course, p.11)"}]
     assert captured == {"question": "What is a wavelet?", "k": 3}
+
+
+def test_ask_job_surfaces_friendly_message_on_free_tier_capacity_error(client, monkeypatch):
+    class _StatusError(Exception):
+        def __init__(self):
+            super().__init__("Error code: 413 - {'error': {'code': 'rate_limit_exceeded'}}")
+            self.status_code = 413
+
+    def fake_stream_answer(
+        question, *, k=5, course=None, chapter=None, owner=None, language=None, api_key=None
+    ):
+        yield {"type": "stage", "stage": "retrieving"}
+        raise _StatusError()
+
+    monkeypatch.setattr(api_main, "stream_answer", fake_stream_answer)
+
+    job_id = client.post("/ask/async", json={"student_id": "s1", "question": "Q?"}).json()["job_id"]
+    job = _wait_for_ask_job(client, job_id, "s1")
+    assert job["status"] == "error"
+    # The job's raw str(exc) is replaced by the friendly, actionable message
+    # (this is exactly what AskPanel.tsx toasts to the user).
+    assert "own OpenAI or Anthropic API key" in job["message"]
 
 
 def test_ask_job_returns_partial_then_final(client, monkeypatch):
