@@ -157,7 +157,7 @@ def test_ensure_payload_indexes_covers_course_and_document(monkeypatch):
     _patch_index(monkeypatch, client)
     index.index_chunks([_chunk("a")])
     # Keyword indexes are created for every filterable payload field.
-    assert set(client.indexed_fields) == {"course", "document", "owner"}
+    assert set(client.indexed_fields) == {"course", "document", "owner", "chapter"}
 
 
 def test_ensure_payload_indexes_is_best_effort(monkeypatch):
