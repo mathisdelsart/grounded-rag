@@ -50,8 +50,27 @@ const BARE_ENV_RE = new RegExp(
  * and is protected verbatim, skipping `escapeStrayDoubleDollar` below and
  * leaking as an unterminated KaTeX delimiter.
  */
+// The `$`/`$$` delimiters carry a `(?<!\\)` guard so a backslash-escaped `\$`
+// (a currency sign we escape below, or a stray-dollar guard's output) is never
+// treated as a math delimiter and never mispairs with a real `$...$` further
+// along the line.
 const PROTECTED_RE =
-  /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`|\$\$[\s\S]*?\$\$|\$[^$\n]+\$)/g;
+  /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`|(?<!\\)\$\$[\s\S]*?\$\$|(?<!\\)\$[^$\n]+\$)/g;
+
+/** Code regions to shield from currency escaping (a literal `$5` in code). */
+const CODE_RE = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g;
+
+/**
+ * A `$` acting as a currency sign, not a math delimiter: it directly precedes a
+ * number (with optional thousands/decimal separators) that is followed by
+ * whitespace, a terminating punctuation mark or end-of-string -- e.g.
+ * "$150,000 loan" or "$150,000.". The trailing `[.,](?!\d)` matches a sentence
+ * period or comma but not a decimal point or thousands separator, so the whole
+ * number is consumed rather than stopping mid-number; a `$` whose number is
+ * instead followed by `$` or `\` is left alone, since that is intended inline
+ * math (e.g. `$83,640$`, `$4.8\%$`).
+ */
+const CURRENCY_DOLLAR_RE = /\$(?=\d[\d,]*(?:\.\d+)?(?:[\s;:!?)]|[.,](?!\d)|$))/g;
 
 /**
  * Wrap common bare LaTeX (not already inside `$`/`$$`) in math delimiters so
@@ -97,6 +116,11 @@ function escapeStrayDollar(segment: string): string {
   return `${segment.slice(0, last)}\\$${segment.slice(last + 1)}`;
 }
 
+/** Escape currency `$` so it never opens a math span that swallows prose. */
+function escapeCurrencyDollars(segment: string): string {
+  return segment.replace(CURRENCY_DOLLAR_RE, "\\$");
+}
+
 function normalizePlainSegment(segment: string): string {
   return escapeStrayDollar(escapeStrayDoubleDollar(segment))
     .replace(BRACKET_DISPLAY_RE, (_match, inner: string) => `$$${inner}$$`)
@@ -112,7 +136,16 @@ function normalizePlainSegment(segment: string): string {
  */
 export function normalizeMath(markdown: string): string {
   if (!markdown) return markdown;
-  const parts = markdown.split(PROTECTED_RE);
+  // Escape currency `$` (e.g. "$150,000 loan") before any math-delimiter
+  // pairing, so a currency sign is never mistaken for the opening of an inline
+  // math span that then swallows the following prose (and mispairs with a real
+  // `$...$` further along the line). Code regions are shielded so a literal
+  // `$5` inside code or a fence is left untouched.
+  const deCurrencied = markdown
+    .split(CODE_RE)
+    .map((part, index) => (index % 2 === 1 ? part : escapeCurrencyDollars(part)))
+    .join("");
+  const parts = deCurrencied.split(PROTECTED_RE);
   return parts
     .map((part, index) =>
       // Odd indices are the captured protected regions -> leave untouched.
