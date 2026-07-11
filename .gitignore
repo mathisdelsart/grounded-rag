@@ -27,3 +27,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Local benchmark run outputs (eval/bench_runner.py)
+eval/benchmark/

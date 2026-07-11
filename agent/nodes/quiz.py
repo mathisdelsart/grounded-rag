@@ -72,20 +72,40 @@ def _system_prompt(n: int, language: str | None) -> str:
     return _SYSTEM.format(n=n, lang=_language_instruction(language, subject="the quiz"))
 
 
+def _loads_lenient(blob: str) -> Any:
+    """``json.loads`` that tolerates LaTeX with unescaped backslashes.
+
+    Quiz questions carry mathematics as LaTeX (``$\\rho$``, ``\\sqrt``,
+    ``\\frac``). A model frequently emits those with a SINGLE backslash inside the
+    JSON string, which is an invalid JSON escape, so ``json.loads`` raises and the
+    quiz was wrongly reported as "not covered by the course". On that failure,
+    escape every stray backslash (all but ``\\"``) and retry: doubling ``\\`` in
+    the JSON source means ``json.loads`` then un-escapes it back to a single
+    backslash, so the LaTeX is preserved verbatim for rendering. Returns the
+    decoded value, or ``None`` when it still cannot be parsed.
+    """
+    try:
+        return json.loads(blob)
+    except (ValueError, TypeError):
+        pass
+    try:
+        return json.loads(re.sub(r'\\(?!")', r"\\\\", blob))
+    except (ValueError, TypeError):
+        return None
+
+
 def _parse_questions(raw: str, n: int) -> list[dict[str, str]]:
     """Parse the model output into ``[{"problem", "solution"}, ...]``.
 
-    Tolerates text surrounding the JSON array. Each item is coerced to a
-    problem/solution pair; malformed items are skipped. At most ``n`` questions
-    are kept so an over-eager model cannot inflate the quiz.
+    Tolerates text surrounding the JSON array (e.g. a ``` ```json ``` fence) and
+    LaTeX with unescaped backslashes (see :func:`_loads_lenient`). Each item is
+    coerced to a problem/solution pair; malformed items are skipped. At most ``n``
+    questions are kept so an over-eager model cannot inflate the quiz.
     """
     match = re.search(r"\[.*\]", raw, re.DOTALL)
     if not match:
         return []
-    try:
-        data = json.loads(match.group(0))
-    except (ValueError, TypeError):
-        return []
+    data = _loads_lenient(match.group(0))
     if not isinstance(data, list):
         return []
 

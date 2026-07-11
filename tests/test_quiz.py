@@ -203,6 +203,26 @@ def test_generate_quiz_generates_when_sources_cover_notion(engine, monkeypatch):
     ]
 
 
+def test_generate_quiz_parses_latex_with_unescaped_backslashes(engine, monkeypatch):
+    # Regression: a math-heavy quiz whose JSON strings carry LaTeX with SINGLE
+    # backslashes (\rho, \sqrt, \gamma) is invalid JSON and used to fail to parse
+    # -> the node wrongly reported "not covered by the course". It must now parse,
+    # not refuse, and preserve the LaTeX (single backslash) for rendering.
+    _patch_retrieve(monkeypatch, _make_retrieved("Portfolio variance and correlation."))
+    latex_reply = (
+        '[{"problem": "How does $\\rho_{12}$ affect risk when $\\rho_{12} = -1$?",'
+        ' "solution": "Portfolio variance uses $\\sqrt{w_1^2 + w_2^2}$."}]'
+    )
+    _patch_llm(monkeypatch, latex_reply)
+
+    result = generate_quiz("portfolio correlation", 2, "zoe")
+
+    assert result["refused"] is False
+    assert result["questions"][0]["problem"] == (
+        "How does $\\rho_{12}$ affect risk when $\\rho_{12} = -1$?"
+    )
+
+
 def test_generate_quiz_refuses_when_model_returns_no_question(engine, monkeypatch):
     _patch_retrieve(monkeypatch, _make_retrieved("Group axioms."))
     _patch_llm(monkeypatch, "no usable json here")
