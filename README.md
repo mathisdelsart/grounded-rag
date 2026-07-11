@@ -141,7 +141,7 @@ make web
 
 Open <http://localhost:3000>, ask an in-course question (grounded, cited) and an out-of-course one
 (honest refusal). For the full recipe — pulling models, ingesting a course, resetting the dev DB —
-see **[docs/RUN-LOCAL.md](docs/RUN-LOCAL.md)** and **[docs/LOCAL.md](docs/LOCAL.md)**.
+see **[docs/RUN-LOCAL.md](docs/RUN-LOCAL.md)** and **[docs/RUN-LOCAL.md](docs/RUN-LOCAL.md)**.
 
 <details>
 <summary>Prefer the CLI / OpenAI?</summary>
@@ -164,7 +164,7 @@ Run the API with `uv run uvicorn api.main:app --reload` and browse the interacti
 | --- | --- |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Module-level walkthrough of the whole system |
 | [docs/RUN-LOCAL.md](docs/RUN-LOCAL.md) | Run the full stack (Qdrant + API + web) locally |
-| [docs/LOCAL.md](docs/LOCAL.md) | Fully local, zero-cost runs with Ollama |
+| [docs/RUN-LOCAL.md](docs/RUN-LOCAL.md) | Fully local, zero-cost runs with Ollama |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Free-tier live deployment (Vercel + Hugging Face Spaces + Qdrant Cloud) |
 | [docs/DEPLOY-API.md](docs/DEPLOY-API.md) | The CPU-only Docker image for the API service |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | Opt-in LangFuse tracing |

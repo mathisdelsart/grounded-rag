@@ -124,7 +124,7 @@ def metrics_to_dict(metrics: Metrics) -> dict[str, Any]:
     """Return a plain JSON-serializable dict view of the aggregated metrics.
 
     Pure helper (no I/O): keys mirror the :class:`Metrics` fields, so the result
-    round-trips through ``ui.metrics.load_metrics_file`` and feeds the dashboard.
+    is a stable JSON-serializable snapshot of the aggregated metrics.
     """
     return asdict(metrics)
 
@@ -132,8 +132,8 @@ def metrics_to_dict(metrics: Metrics) -> dict[str, Any]:
 def write_results(metrics: Metrics, path: Path) -> None:
     """Write the aggregated metrics to ``path`` as a JSON object.
 
-    Creates parent directories as needed. The file is consumed by the metrics
-    dashboard (``ui/metrics.py``); it is a build artifact and is not committed.
+    Creates parent directories as needed. The file is a build artifact (the
+    optional ``--out`` of the eval CLI) and is not committed.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(metrics_to_dict(metrics), indent=2), encoding="utf-8")

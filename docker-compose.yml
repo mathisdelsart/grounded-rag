@@ -1,5 +1,5 @@
 # The persistent vector store runs in Docker; the FastAPI API and the Streamlit
-# UI run on the host (`make api` / `make ui`), where the local embedding model
+# UI run on the host (`make api`), where the local embedding model
 # (bge-m3 via torch) is already set up. This keeps the container light and avoids
 # shipping multi-gigabyte ML wheels — the standard split for an ML app.
 services:
