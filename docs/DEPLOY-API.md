@@ -32,7 +32,7 @@ tables via SQLAlchemy on startup, so no migration step runs on boot).
 ## Build
 
 ```bash
-docker build -t grounded-rag-api .
+docker build -t sourcio-api .
 ```
 
 The `torch` download is large (CPU wheels). The build caches it in its own layer,
@@ -47,7 +47,7 @@ OpenAI and a remote Qdrant:
 docker run --rm -p 8000:8000 \
   -e QDRANT_URL="https://your-qdrant-host:6333" \
   -e OPENAI_API_KEY="sk-..." \
-  grounded-rag-api
+  sourcio-api
 ```
 
 Fully local LLM via Ollama instead of OpenAI (point at an Ollama server reachable
@@ -58,7 +58,7 @@ docker run --rm -p 8000:8000 \
   -e QDRANT_URL="https://your-qdrant-host:6333" \
   -e LLM_PROVIDER=ollama \
   -e OLLAMA_BASE_URL="http://your-ollama-host:11434" \
-  grounded-rag-api
+  sourcio-api
 ```
 
 Then check `http://localhost:8000/health` and the docs at

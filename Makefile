@@ -7,7 +7,7 @@ SHELL := /bin/sh
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install local-install local qdrant hooks lint fmt fmt-check test check api ui web dev eval eval-report ingest ingest-prod ask up down clean reset-db
+.PHONY: help install local-install local qdrant hooks lint fmt fmt-check test check api web dev eval eval-report ingest ingest-prod ask up down clean reset-db
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Available targets:\n"} \
@@ -20,9 +20,9 @@ local-install: ## Install the Ollama provider extra for fully local runs
 	uv sync --extra local
 
 # Print the env needed to run the whole stack against a local Ollama server
-# (zero cost, fully offline). Eval into your shell, then run make ask / api / ui.
+# (zero cost, fully offline). Eval into your shell, then run make ask / api / web.
 # Usage: eval "$$(make local)" && make ask Q="..."
-# Requires: `ollama serve` running and the chat/vision models pulled (see docs/LOCAL.md).
+# Requires: `ollama serve` running and the chat/vision models pulled (see docs/RUN-LOCAL.md).
 local: ## Print env to switch the stack to local Ollama (eval it in your shell)
 	@echo "export LLM_PROVIDER=ollama"
 	@echo "export OLLAMA_BASE_URL=http://localhost:11434"
@@ -53,9 +53,6 @@ check: lint fmt-check test ## Run lint, format check, and tests
 api: ## Run the FastAPI app with autoreload
 	uv run uvicorn api.main:app --reload
 
-ui: ## Run the Streamlit UI
-	uv run streamlit run ui/app.py
-
 web: ## Run the Next.js web frontend (installs deps, http://localhost:3000)
 	cd web && npm install && npm run dev
 
@@ -70,7 +67,7 @@ dev: qdrant ## Start the full local stack (Qdrant up + the two commands to run)
 	@echo "  1) API  (port 8000):  LLM_PROVIDER=ollama make api"
 	@echo "  2) Web  (port 3000):  make web"
 	@echo ""
-	@echo "Prereqs: 'ollama serve' running with models pulled (see docs/LOCAL.md)."
+	@echo "Prereqs: 'ollama serve' running with models pulled (see docs/RUN-LOCAL.md)."
 	@echo "Full guide: docs/RUN-LOCAL.md"
 
 eval: ## Run the offline evaluation (faithfulness judge)

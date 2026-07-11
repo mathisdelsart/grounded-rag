@@ -24,7 +24,6 @@ from eval.run_eval import (
     run_eval,
     write_results,
 )
-from ui.metrics import format_metric_cards, load_metrics_file
 
 # --- dataset loader -------------------------------------------------------
 
@@ -490,7 +489,9 @@ def test_metrics_to_dict_exposes_all_fields():
     }
 
 
-def test_metrics_to_dict_round_trips_through_load_metrics_file(tmp_path):
+def test_write_results_round_trips_as_json(tmp_path):
+    import json
+
     metrics = Metrics(
         refusal_accuracy=1.0,
         faithfulness_rate=0.75,
@@ -503,23 +504,20 @@ def test_metrics_to_dict_round_trips_through_load_metrics_file(tmp_path):
     path = tmp_path / "results.json"
     write_results(metrics, path)
 
-    loaded = load_metrics_file(path)
+    loaded = json.loads(path.read_text(encoding="utf-8"))
     assert loaded == metrics_to_dict(metrics)
     assert loaded["faithfulness_rate"] == 0.75
     assert loaded["retrieval_hit_rate"] == 0.5
     assert loaded["total"] == 3
 
-    # The loaded dict feeds the dashboard cards unchanged.
-    by_key = {c.key: c for c in format_metric_cards(loaded)}
-    assert by_key["faithfulness_rate"].display == "75%"
-    assert by_key["retrieval_hit_rate"].display == "50%"
-
 
 def test_write_results_creates_parent_directories(tmp_path):
+    import json
+
     path = tmp_path / "nested" / "dir" / "results.json"
     write_results(Metrics(1.0, 1.0, 1.0), path)
     assert path.exists()
-    assert load_metrics_file(path)["refusal_accuracy"] == 1.0
+    assert json.loads(path.read_text(encoding="utf-8"))["refusal_accuracy"] == 1.0
 
 
 def test_main_with_out_writes_results_file(tmp_path):
@@ -528,6 +526,8 @@ def test_main_with_out_writes_results_file(tmp_path):
     The whole evaluation is driven by monkeypatching ``run_eval`` so no answer
     function, judge or retrieval is wired; only the JSON-writing path is tested.
     """
+    import json
+
     import eval.run_eval as run_eval_module
 
     metrics = Metrics(
@@ -547,7 +547,7 @@ def test_main_with_out_writes_results_file(tmp_path):
         run_eval_module.run_eval = original
 
     assert code == 0
-    assert load_metrics_file(out_path) == metrics_to_dict(metrics)
+    assert json.loads(out_path.read_text(encoding="utf-8")) == metrics_to_dict(metrics)
 
 
 def test_main_without_out_does_not_write(tmp_path, monkeypatch):

@@ -1,6 +1,6 @@
 # Architecture
 
-`grounded-rag` is a course tutor that answers questions **strictly from the
+`sourcio` is a course tutor that answers questions **strictly from the
 user's own course material**. The guiding principle drives every design choice:
 never leave the course, always cite the source, and refuse when a question is
 not covered. This document explains how the system is put together so a new
@@ -8,7 +8,7 @@ contributor can find their way around.
 
 ## Guiding principle
 
-| Risk with a general assistant | How `grounded-rag` addresses it |
+| Risk with a general assistant | How `sourcio` addresses it |
 | --- | --- |
 | Documents are lost between conversations | A persistent vector store (Qdrant), courses indexed once |
 | Answers drift to out-of-course methods | Retrieval is restricted to the course; nothing else is in context |
@@ -323,25 +323,6 @@ call.
 The database engine is bound on startup (or injected by tests via
 `configure_engine`).
 
-### UI (`ui/`)
-
-`ui/app.py` is a Streamlit demo that calls the HTTP endpoints (via the typed
-`TutorClient`) rather than importing library functions, so the UI and server
-share one contract. `ui/metrics.py` is a read-only dashboard surfacing the
-offline eval metrics (from `eval/results.json`) and DB usage stats. All
-non-Streamlit logic lives in pure helpers that are unit-tested without the
-optional `ui` extra (`tests/test_ui.py`, `tests/test_metrics.py`).
-
-A separate **Next.js (App Router) · TypeScript · Tailwind** frontend lives in
-`web/` — the premium UI, distinct from the Streamlit demo. It is likewise a thin
-typed client over the same FastAPI backend (`web/lib/api.ts`, one function per
-endpoint), adding bilingual **EN/FR** copy (`web/lib/i18n.tsx`), a light/dark
-theme toggle, **streaming answers** over Server-Sent Events (`askStream`),
-citation chips, an auth menu, a dynamic course picker (`GET /courses`), and
-per-answer feedback. Its tabs are Ask · Re-explain · Exercise · Grade · Quiz ·
-Threads · History (`web/components/panels/`). Build/run details are in
-`web/README.md`.
-
 ## Quality layer (offline / CI)
 
 This is the system-quality guard against hallucination — **distinct** from the
@@ -410,7 +391,7 @@ The same switch enables a **fully-local, zero-cost** run: `LLM_PROVIDER=ollama`
 (or a per-role `LLM_<ROLE>=ollama:<model>`) routes every LLM to a local
 [Ollama](https://ollama.com) server (`Settings.ollama_base_url`). Embeddings, the
 reranker, and Qdrant are already local, so the whole pipeline then runs offline
-and free — see [LOCAL.md](LOCAL.md). For serving, the API ships as a **CPU-only
+and free — see [RUN-LOCAL.md](RUN-LOCAL.md). For serving, the API ships as a **CPU-only
 Docker image** that installs a CPU-only `torch` to avoid multi-gigabyte CUDA
 wheels; build and run details are in [DEPLOY-API.md](DEPLOY-API.md), and a
 free-tier hosted path in [DEPLOY.md](DEPLOY.md).
@@ -506,12 +487,11 @@ guard apply transparently when enabled.
 | User auth (bcrypt + JWT) | `api/auth.py` |
 | Logging / middleware (request-id, security headers, rate limit) | `api/logging_config.py`, `api/middleware.py` |
 | Spaced-repetition scheduler (SM-2) | `core/scheduling.py` |
-| Streamlit UI + metrics dashboard | `ui/app.py`, `ui/metrics.py` |
 | Next.js web frontend (premium UI) | `web/` (`web/app/`, `web/components/`, `web/lib/`) |
 | Relational store | `db/models.py`, `db/session.py`, `alembic/` |
 | LLM factory, settings, cache | `core/config.py` |
 | Tracing (LangFuse) / latency / budget | `core/obs.py`, `core/budget.py` |
-| Deployment guides | `docs/DEPLOY-API.md` (Docker image), `docs/DEPLOY.md` (free-tier), `docs/LOCAL.md` (Ollama), `docs/OBSERVABILITY.md`, `docs/POSTGRES.md` |
+| Deployment guides | `docs/DEPLOY-API.md` (Docker image), `docs/DEPLOY.md` (free-tier), `docs/RUN-LOCAL.md` (Ollama), `docs/OBSERVABILITY.md`, `docs/POSTGRES.md` |
 | Faithfulness eval / calibration | `eval/run_eval.py`, `eval/calibrate.py` |
 | Containerization | `docker-compose.yml`, `Dockerfile` |
 | CI | `.github/workflows/ci.yml` |

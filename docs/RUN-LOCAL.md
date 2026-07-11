@@ -6,7 +6,7 @@ with **no paid API calls** by pointing the LLM at a local
 [Ollama](https://ollama.com) server.
 
 For the LLM-provider details (installing Ollama, which models to pull, and the
-`LLM_PROVIDER=ollama` switch) see **[docs/LOCAL.md](LOCAL.md)**. This page is the
+`LLM_PROVIDER=ollama` switch) see **[docs/RUN-LOCAL.md](RUN-LOCAL.md)**. This page is the
 end-to-end "run everything" recipe.
 
 ## Prerequisites
@@ -15,7 +15,7 @@ end-to-end "run everything" recipe.
 - **uv** — manages the Python backend (`make api`).
 - **Node.js** (18+) and **npm** — run the web frontend (`make web`).
 - **Ollama**, with the chat model (and, for ingestion, the vision model) pulled.
-  See [docs/LOCAL.md](LOCAL.md) for the exact `ollama pull` commands; in short:
+  See [docs/RUN-LOCAL.md](RUN-LOCAL.md) for the exact `ollama pull` commands; in short:
 
   ```sh
   ollama serve            # leave running
@@ -52,7 +52,7 @@ make web                                 # http://localhost:3000
 frontend dependencies; later runs are fast.
 
 > Need to ingest a course first? With the stack local, ingestion is also free —
-> see [docs/LOCAL.md](LOCAL.md) (`make ingest`, optionally `--hybrid` to avoid a
+> see [docs/RUN-LOCAL.md](RUN-LOCAL.md) (`make ingest`, optionally `--hybrid` to avoid a
 > vision model on text-heavy decks).
 
 ## What the web frontend needs
@@ -115,3 +115,4 @@ Then restart the API.
    **"refused — not covered"** response instead of an invented answer.
 
 If all three hold, the full local, zero-cost stack is working end to end.
+
