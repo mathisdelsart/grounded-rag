@@ -298,7 +298,7 @@ class IngestJob(Base):
     record is stored as JSON in ``data`` (the exact shape the API returns); a few
     columns are mirrored for ordering (``created_at``) and retention pruning
     (``finished_at``). Answer jobs stay in memory (they update per token, which
-    would be far too write-heavy to persist) — see :mod:`core.jobs`.
+    would be far too write-heavy to persist) — see :mod:`api.jobs`.
     """
 
     __tablename__ = "ingest_jobs"

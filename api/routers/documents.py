@@ -17,6 +17,7 @@ from api.deps import (
     _scoped_read_owner,
     require_api_key,
 )
+from api.jobs import create_job, get_job, list_jobs, update_job
 from api.schemas import (
     DocumentCourse,
     DocumentDeleteResponse,
@@ -24,7 +25,6 @@ from api.schemas import (
     DocumentRenameResponse,
 )
 from core.errors import describe_capacity_error
-from core.jobs import create_job, get_job, list_jobs, update_job
 from db.session import get_session
 
 router = APIRouter()
@@ -86,7 +86,7 @@ async def upload_document(
     A plain daemon thread is used deliberately: FastAPI ``BackgroundTasks`` run
     within the request scope (defeating the purpose), and ``stream_ingest`` is a
     blocking, synchronous generator so it cannot run on the event loop. The job
-    registry is in-process — see the multi-worker caveat in ``core.jobs``.
+    registry is in-process — see the multi-worker caveat in ``api.jobs``.
 
     ``openai_key`` is an OPTIONAL, visitor-supplied OpenAI key used ONLY to
     transcribe a scanned/image PDF on the visitor's own account (so the app owner
