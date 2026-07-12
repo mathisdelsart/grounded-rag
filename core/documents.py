@@ -23,6 +23,7 @@ The Qdrant client is built from settings, matching ``core.courses`` and
 ``core.sources``.
 """
 
+import contextlib
 import os
 import re
 import time
@@ -178,10 +179,10 @@ def save_upload(data: bytes, course: str, filename: str) -> str:
     with open(path, "wb") as handle:
         handle.write(data)
     if storage.configured():
-        try:
+        # Best-effort durable mirror: a failure here must not fail the upload,
+        # which has already succeeded locally.
+        with contextlib.suppress(Exception):
             storage.put_object(_r2_key(course, filename), data)
-        except Exception:
-            pass
     return path
 
 
@@ -779,19 +780,16 @@ def _move_course_dir(old_course: str, new_course: str) -> None:
       rename); a destination key that already exists is overwritten, matching
       the "merge into an existing course" behavior of the local-disk move.
     """
-    try:
+    # Both moves are independently best-effort and must never raise (see docstring).
+    with contextlib.suppress(Exception):
         source = _course_dir(old_course)
         dest = _course_dir(new_course)
         if os.path.isdir(source) and not os.path.exists(dest):
             os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
             os.rename(source, dest)
-    except Exception:
-        pass
     if storage.configured():
-        try:
+        with contextlib.suppress(Exception):
             storage.copy_prefix(_slug(old_course) + "/", _slug(new_course) + "/")
-        except Exception:
-            pass
 
 
 def rename_course(owner: str | None, old_course: str, new_course: str) -> int:

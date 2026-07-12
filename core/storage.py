@@ -35,6 +35,7 @@ the call site instead of hidden in this module.
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime
 from typing import Any
 
@@ -149,7 +150,9 @@ def copy_prefix(old_prefix: str, new_prefix: str) -> None:
     overwritten by ``copy_object``, matching a course-name merge being
     acceptable (same as the local-disk rename).
     """
-    try:
+    # Best-effort (see docstring): never raise, so a failure here cannot fail the
+    # Qdrant payload rename that already succeeded.
+    with contextlib.suppress(Exception):
         settings = get_settings()
         client = _client()
         bucket = settings.r2_bucket
@@ -161,5 +164,3 @@ def copy_prefix(old_prefix: str, new_prefix: str) -> None:
                 Bucket=bucket, CopySource={"Bucket": bucket, "Key": key}, Key=new_key
             )
             client.delete_object(Bucket=bucket, Key=key)
-    except Exception:
-        pass

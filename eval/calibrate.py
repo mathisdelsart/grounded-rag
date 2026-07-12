@@ -21,6 +21,7 @@ out-of-course question (should score low).
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -210,7 +211,7 @@ def _default_score_fn(k: int = 5) -> ScoreFn:
 
 def _fmt(value: float) -> str:
     """Format a score, tolerating NaN for empty classes."""
-    return "n/a" if value != value else f"{value:.3f}"
+    return "n/a" if math.isnan(value) else f"{value:.3f}"
 
 
 def format_report(calibration: Calibration, current_threshold: float) -> str:

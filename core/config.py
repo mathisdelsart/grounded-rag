@@ -279,6 +279,9 @@ def configure_cache() -> None:
     global _cache_configured
     if _cache_configured:
         return
+    # Decide once: mark configured up front so a disabled-cache config also short
+    # circuits on later calls instead of re-parsing settings every time.
+    _cache_configured = True
 
     from langchain_core.caches import InMemoryCache
     from langchain_core.globals import set_llm_cache
@@ -299,7 +302,6 @@ def configure_cache() -> None:
         cache = InMemoryCache()
 
     set_llm_cache(cache)
-    _cache_configured = True
 
 
 def _resolve_model(role: str) -> tuple[str, dict]:
