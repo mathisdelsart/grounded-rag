@@ -363,7 +363,8 @@ def test_summarize_quiz_threads_rigor_to_judge(engine, monkeypatch):
         "agent.nodes.grade.get_llm", lambda role="default", api_key=None: _CaptureLLM()
     )
     monkeypatch.setattr(
-        "agent.nodes.quiz_grade.get_llm", lambda role="default", api_key=None: _FakeLLM("Keep going.")
+        "agent.nodes.quiz_grade.get_llm",
+        lambda role="default", api_key=None: _FakeLLM("Keep going."),
     )
 
     summarize_quiz(quiz_id, [{"question_id": q0, "answer": "a0"}], "zoe", "lenient")
