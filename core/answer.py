@@ -9,7 +9,8 @@ the question is refused rather than answered from the model's own knowledge.
 import re
 from collections.abc import Iterator
 
-from core.config import get_llm, get_settings
+from core.config import get_settings
+from core.llm import get_llm
 from core.obs import get_callbacks, timer
 from core.prompts import REFUSAL, language_instruction
 from core.retrieval import retrieve, retrieve_multi
@@ -203,7 +204,7 @@ def answer(
     model answers in the question's own language. ``api_key`` is an optional
     per-request OpenAI key: when set, the explanation (and any HyDE/multi-query
     router call) runs on the visitor's own OpenAI model instead of the free
-    default (see :func:`core.config.get_llm`).
+    default (see :func:`core.llm.get_llm`).
     """
     with timer("retrieval"):
         results = _retrieve(

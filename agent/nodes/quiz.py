@@ -22,7 +22,7 @@ import re
 from typing import Any
 
 from agent.state import Rigor
-from core.config import get_llm
+from core.llm import get_llm
 from core.obs import get_callbacks
 from core.prompts import REFUSAL, language_instruction
 from ingestion.schema import format_numbered_sources
