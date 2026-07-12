@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import DataUser, _iso_utc, _resolve_student, _student_for_read, require_api_key
 from api.schemas import HistoryItem, SessionCreateRequest, SessionOut
@@ -32,7 +32,7 @@ def create_session(
     time. This route is additive: the existing flat ``/history`` keeps working
     and threads are entirely opt-in.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _resolve_student(session, request.student_id, user)
         thread = SessionModel(student_id=student.id, title=request.title)
         session.add(thread)
@@ -55,7 +55,7 @@ def list_sessions(student_id: str, user: UserOut | None = DataUser) -> list[dict
     An unknown student yields an empty list rather than an error. In require_auth
     mode the student must belong to the caller (403 otherwise).
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         if student is None:
             return []
@@ -88,7 +88,7 @@ def session_messages(
     so a caller can never read another student's thread. In require_auth mode the
     student must belong to the caller (403 otherwise).
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         thread = None
         if student is not None:
@@ -132,7 +132,7 @@ def delete_session_route(
     404 when the thread does not exist or is not owned by the student. In
     require_auth mode the student must belong to the caller (403 otherwise).
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         thread = None
         if student is not None:

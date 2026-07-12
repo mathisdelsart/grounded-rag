@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import DataUser, _iso_utc, _resolve_student, _student_for_read, require_api_key
 from api.schemas import EnqueueReviewRequest, ReviewRequest, ReviewSchedule
@@ -34,7 +34,7 @@ def record_review(request: ReviewRequest, user: UserOut | None = DataUser) -> di
     LLM and runs no retrieval.
     """
     now = datetime.now(UTC)
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _resolve_student(session, request.student_id, user)
         row = session.scalar(
             select(Review).where(Review.student_id == student.id, Review.notion == request.notion)
@@ -91,7 +91,7 @@ def enqueue_review(
     reaches no LLM and runs no retrieval.
     """
     now = datetime.now(UTC)
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _resolve_student(session, request.student_id, user)
         row = session.scalar(
             select(Review).where(Review.student_id == student.id, Review.notion == request.notion)
@@ -130,7 +130,7 @@ def due_reviews(student_id: str, user: UserOut | None = DataUser) -> list[dict[s
     require_auth mode the student must belong to the caller (403 otherwise).
     """
     now = datetime.now(UTC)
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         if student is None:
             return []

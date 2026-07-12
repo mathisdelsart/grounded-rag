@@ -4,8 +4,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
-import api.main as api_main
 from agent.state import TutorState
+from api import runtime
 from api.auth import UserOut
 from api.deps import DataUser, OpenAIKey, _resolve_student, require_api_key
 from api.schemas import GradeRequest, GradeResponse
@@ -27,7 +27,7 @@ def grade_answer(
     authenticated); grade persistence is owned by the agent node, which needs the
     ``student_id`` (and the exercise's id) to link the grade to its exercise.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     state: TutorState = {
         "message": request.message,
@@ -38,7 +38,7 @@ def grade_answer(
     if request.exercise is not None:
         state["exercise"] = request.exercise
     try:
-        verdict = api_main.grade(state).get("grade")
+        verdict = runtime.grade(state).get("grade")
     except Exception as exc:
         raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
         raise

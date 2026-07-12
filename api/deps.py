@@ -5,9 +5,10 @@ data-user guards, the optional per-request OpenAI key, student resolution and
 ownership enforcement, thread validation and activity persistence.
 
 Runtime state that tests swap at will — the database engine and the settings
-factory — is read through the ``api.main`` module at call time (never bound at
-import), so monkeypatching ``api.main._engine`` / ``api.main.get_settings`` keeps
-driving these helpers exactly as when they lived in ``api.main`` itself.
+factory — is read through the leaf ``api.runtime`` module at call time (never
+bound at import), so monkeypatching ``api.runtime._engine`` /
+``api.runtime.get_settings`` keeps driving these helpers, and nothing here
+imports back into ``api.main``.
 """
 
 import hmac
@@ -17,7 +18,7 @@ from typing import Annotated, Any
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut, get_current_user, get_optional_user
 from db.models import Session as SessionModel
 from db.models import Student
@@ -43,7 +44,7 @@ def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
     set, the request must carry a matching ``X-API-Key`` header; otherwise the
     request is rejected with 401. ``/health`` never depends on this guard.
     """
-    expected = api_main.get_settings().api_key
+    expected = runtime.get_settings().api_key
     if not expected:
         return
     if not hmac.compare_digest(x_api_key or "", expected):
@@ -60,7 +61,7 @@ def get_data_user(authorization: str | None = Header(default=None)) -> UserOut |
     otherwise); when off, authentication stays optional (anonymous allowed),
     preserving the MVP behaviour byte-for-byte.
     """
-    if api_main.get_settings().require_auth:
+    if runtime.get_settings().require_auth:
         return get_current_user(authorization)
     return get_optional_user(authorization)
 
@@ -167,7 +168,7 @@ def _scoped_read_owner(external_id: str | None, user: UserOut | None) -> str | N
     """
     if external_id is None:
         return None
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _student_for_read(session, external_id, user)
     return external_id
 
@@ -209,7 +210,7 @@ def _record_activity(
     summary, never a full JSON blob. ``ref_id`` links the turn back to the
     persisted exercise/quiz so the history can fetch the full item for review.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _resolve_student(session, external_id, user)
         thread_id = _resolve_session_id(session, student.id, session_id)
         add_message(

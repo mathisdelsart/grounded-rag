@@ -38,31 +38,23 @@ middleware, CORS and the unhandled-exception handler. The route handlers live in
 ``api.routers`` (one ``APIRouter`` per domain) and the shared dependencies and
 Pydantic models in ``api.deps`` / ``api.schemas``.
 
-The grounded functions and graph nodes are imported here and re-exported so the
-route modules resolve them through this module at call time (``api.main.answer``
-etc.). This preserves the single, swappable indirection point the test suite
-monkeypatches; ``_engine`` and ``get_settings`` are likewise read through this
-module so tests can bind an in-memory database and override settings.
+The application object (``app``), startup lifespan, middleware, CORS and the
+unhandled-exception handler live here. The grounded functions, graph nodes and
+the database engine that route handlers call at request time live in the leaf
+module ``api.runtime`` (which nothing imports back into ``api.main``, breaking
+the import cycle); that is also the single indirection point the test suite
+monkeypatches.
 """
 
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import Engine
 
-# Grounded functions and graph nodes, imported here so they are attributes of
-# this module (``api.main.answer`` etc.). The route modules call them through
-# ``api.main`` at request time, which keeps a single indirection point the tests
-# monkeypatch. They are re-exports; see ``__all__``.
-from agent.nodes.generate import generate
-from agent.nodes.grade import grade
-from agent.nodes.quiz import generate_quiz, grade_quiz_answer, summarize_quiz
-from agent.nodes.reexplain import reexplain, stream_reexplain
+from api import runtime
 from api.logging_config import configure_logging, request_id_var
 from api.middleware import (
     REQUEST_ID_HEADER,
@@ -90,114 +82,19 @@ from api.routers import (
 from api.routers import (
     reexplain as reexplain_router,
 )
-from core.answer import answer, stream_answer
-from core.config import get_settings
-from core.courses import list_chapters, list_courses
-from core.documents import (
-    delete_documents,
-    list_documents,
-    read_stored_file,
-    rename_chapter,
-    rename_course,
-    save_upload,
-    stream_ingest,
-)
-from core.sources import get_source
-from db.session import (
-    configure_session_factory,
-    create_engine_from_settings,
-    get_session,
-    init_db,
-)
 
 logger = logging.getLogger("api")
-
-# Re-exported names: attributes the route modules resolve through ``api.main`` at
-# call time and the test suite monkeypatches. Listed here so the linter treats
-# them as intentional re-exports rather than unused imports.
-__all__ = [
-    "answer",
-    "app",
-    "configure_engine",
-    "delete_documents",
-    "generate",
-    "generate_quiz",
-    "get_session",
-    "get_settings",
-    "get_source",
-    "grade",
-    "grade_quiz_answer",
-    "list_chapters",
-    "list_courses",
-    "list_documents",
-    "read_stored_file",
-    "reexplain",
-    "rename_chapter",
-    "rename_course",
-    "save_upload",
-    "stream_answer",
-    "stream_ingest",
-    "stream_reexplain",
-    "summarize_quiz",
-]
-
-# Bound on startup (or injected by tests via ``configure_engine``). Keeping the
-# engine module-level lets tests swap in an in-memory SQLite database.
-_engine: Engine | None = None
-
-
-def configure_engine(engine: Engine) -> None:
-    """Bind the API to ``engine``, create tables, and configure the session factory.
-
-    Tests call this with an in-memory SQLite engine; startup calls it with the
-    engine built from ``Settings.database_url``.
-    """
-    global _engine
-    _engine = engine
-    init_db(engine)
-    configure_session_factory(engine)
-
-
-# The placeholder secret shipped for local development. It MUST be overridden
-# before enabling ``require_auth`` — otherwise anyone knowing this public default
-# could forge a valid access token.
-_INSECURE_JWT_DEFAULT = "dev-insecure-change-me"
-# Minimum length accepted for a JWT signing secret when auth is required. A short
-# secret is brute-forceable and defeats the point of signing.
-_MIN_JWT_SECRET_LEN = 16
-
-
-def _validate_jwt_secret(settings: Any) -> None:
-    """Fail fast when auth is required but the JWT secret is unsafe.
-
-    Only enforced when ``require_auth`` is on (a public/shared deployment). The
-    default placeholder secret or any secret shorter than
-    :data:`_MIN_JWT_SECRET_LEN` characters is rejected with a clear
-    ``RuntimeError`` so the operator sets a strong ``JWT_SECRET`` instead of
-    silently running with a forgeable one. With ``require_auth`` off (local dev)
-    the placeholder is left alone so nothing changes for single-user runs.
-    """
-    if not settings.require_auth:
-        return
-    secret = settings.jwt_secret
-    if secret == _INSECURE_JWT_DEFAULT or len(secret) < _MIN_JWT_SECRET_LEN:
-        raise RuntimeError(
-            "REQUIRE_AUTH is enabled but JWT_SECRET is unsafe "
-            "(the insecure default or shorter than "
-            f"{_MIN_JWT_SECRET_LEN} characters). Set a strong, random JWT_SECRET "
-            "before running with authentication enabled."
-        )
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Configure structured logging and the database on startup."""
-    settings = get_settings()
+    settings = runtime.get_settings()
     configure_logging(settings.log_level)
     # Refuse to boot a public (auth-required) deployment with a forgeable secret.
-    _validate_jwt_secret(settings)
-    if _engine is None:
-        configure_engine(create_engine_from_settings())
+    runtime._validate_jwt_secret(settings)
+    if runtime._engine is None:
+        runtime.configure_engine(runtime.create_engine_from_settings())
     yield
 
 
@@ -228,7 +125,7 @@ app.add_middleware(RequestIdMiddleware)
 # origins so the `web/` frontend works out of the box; override CORS_ORIGINS in
 # production with the deployed frontend URL.
 _cors_origins = [
-    origin.strip() for origin in get_settings().cors_origins.split(",") if origin.strip()
+    origin.strip() for origin in runtime.get_settings().cors_origins.split(",") if origin.strip()
 ]
 if _cors_origins:
     app.add_middleware(

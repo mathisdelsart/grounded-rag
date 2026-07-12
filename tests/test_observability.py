@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
-import api.main as api_main  # noqa: E402
+from api import runtime as api_main  # noqa: E402
 from api.logging_config import (  # noqa: E402
     JsonFormatter,
     configure_logging,

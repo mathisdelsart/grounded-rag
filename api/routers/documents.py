@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import (
     DataUser,
@@ -49,7 +49,7 @@ def documents(
     the LLM and runs no retrieval.
     """
     owner = _scoped_read_owner(student_id, user)
-    return api_main.list_documents(owner=owner)
+    return runtime.list_documents(owner=owner)
 
 
 @router.post(
@@ -108,7 +108,7 @@ async def upload_document(
     # scoped to that account — never left owner-less (which strict isolation would
     # make invisible to everyone). Resolve (and, when authenticated, enforce
     # ownership of) the uploader before stamping.
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, student_id, user)
     owner: str = student_id
     # Read the whole upload into memory (ingestion needs the bytes anyway) and
@@ -116,21 +116,21 @@ async def upload_document(
     # Content-Length header, so a spoofed header cannot slip an oversized file
     # past the guard. This is a public-abuse safeguard.
     contents = await file.read()
-    max_bytes = api_main.get_settings().max_upload_mb * 1024 * 1024
+    max_bytes = runtime.get_settings().max_upload_mb * 1024 * 1024
     if len(contents) > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"File too large: max {api_main.get_settings().max_upload_mb} MB.",
+            detail=f"File too large: max {runtime.get_settings().max_upload_mb} MB.",
         )
     # Persist the original so the user can re-open the intact file later; ingest
     # from that stored path (its extension drives prose/PDF routing).
-    stored_path = api_main.save_upload(contents, course, file.filename or "document")
+    stored_path = runtime.save_upload(contents, course, file.filename or "document")
     job_id = create_job(course, normalized_chapter, os.path.basename(stored_path))
 
     def run() -> None:
         """Drive the (blocking) ingest, mirroring each event into the job store."""
         try:
-            for event in api_main.stream_ingest(
+            for event in runtime.stream_ingest(
                 stored_path,
                 course,
                 normalized_chapter,
@@ -179,7 +179,7 @@ def document_file(course: str, name: str) -> Response:
     directly (rather than via ``FileResponse``) since an R2-backed file has no
     local path to stream from. An unknown file yields 404.
     """
-    data = api_main.read_stored_file(course, name)
+    data = runtime.read_stored_file(course, name)
     if data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
     media_type, _ = mimetypes.guess_type(name)
@@ -216,10 +216,10 @@ def remove_documents(
     """
     owner: str | None = None
     if student_id is not None:
-        with get_session(api_main._engine) as session:
+        with get_session(runtime._engine) as session:
             _resolve_student(session, student_id, user)
         owner = student_id
-    return {"deleted": api_main.delete_documents(course, chapter, owner)}
+    return {"deleted": runtime.delete_documents(course, chapter, owner)}
 
 
 @router.post(
@@ -247,7 +247,7 @@ def rename_documents(
     points each field's rename updated; an unknown course/chapter or a no-op yields
     zeros rather than an error. It never reaches the LLM and runs no retrieval.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     owner: str = request.student_id
 
@@ -261,10 +261,10 @@ def rename_documents(
     # course+chapter rename in one call still matches; then rename the course.
     chapter_updated = 0
     if request.chapter and request.new_chapter:
-        chapter_updated = api_main.rename_chapter(
+        chapter_updated = runtime.rename_chapter(
             owner, request.course, request.chapter, request.new_chapter
         )
     course_updated = 0
     if request.new_course is not None:
-        course_updated = api_main.rename_course(owner, request.course, request.new_course)
+        course_updated = runtime.rename_course(owner, request.course, request.new_course)
     return {"course_updated": course_updated, "chapter_updated": chapter_updated}

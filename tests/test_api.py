@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine, select  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
-import api.main as api_main  # noqa: E402
+from api import runtime as api_main  # noqa: E402
 from api.main import app  # noqa: E402
 
 

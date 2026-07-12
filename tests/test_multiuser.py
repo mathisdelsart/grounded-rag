@@ -9,7 +9,7 @@ account (403 on a foreign student), giving true tenant isolation.
 
 No LLM, vector store, or network call is involved: the grounded function is
 monkeypatched and the API is bound to an in-memory SQLite database. The flag is
-toggled by monkeypatching ``api.main.get_settings`` (the same cache-safe pattern
+toggled by monkeypatching ``api.runtime.get_settings`` (the same cache-safe pattern
 used by the API-key tests), so no process environment or lru-cache is touched.
 The module is skipped when the optional ``api`` extra is not installed.
 """
@@ -24,7 +24,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine, select  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
-import api.main as api_main  # noqa: E402
+from api import runtime as api_main  # noqa: E402
 from api.main import app  # noqa: E402
 from core.config import Settings  # noqa: E402
 from db.models import Student  # noqa: E402

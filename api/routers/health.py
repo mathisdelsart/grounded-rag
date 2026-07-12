@@ -7,7 +7,7 @@ reach them without credentials.
 
 from fastapi import APIRouter, HTTPException, status
 
-import api.main as api_main
+from api import runtime
 
 router = APIRouter()
 
@@ -28,7 +28,7 @@ def ready() -> dict[str, str]:
     from an orchestrator. Returns 200 with ``{"status": "ready"}`` when the
     engine is configured, otherwise 503 with ``{"status": "not ready"}``.
     """
-    if api_main._engine is None:
+    if runtime._engine is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service is not ready: database engine is not configured.",
@@ -46,4 +46,4 @@ def public_config() -> dict[str, bool]:
     ``{"require_auth": bool}`` — whether every data endpoint requires a valid
     bearer token and enforces per-user student ownership.
     """
-    return {"require_auth": api_main.get_settings().require_auth}
+    return {"require_auth": runtime.get_settings().require_auth}
