@@ -18,14 +18,14 @@ import core.documents as documents_mod
 import core.errors as errors_mod
 from ingestion.schema import Page
 
-# --- core.jobs: the background-job registry ----------------------------------
+# --- api.jobs: the background-job registry ----------------------------------
 
 
 @pytest.fixture
 def jobs_db():
     """Bind an in-memory SQLite database for the persisted ingestion-job helpers.
 
-    Ingestion jobs live in the database, so these direct ``core.jobs`` tests need
+    Ingestion jobs live in the database, so these direct ``api.jobs`` tests need
     a configured session factory of their own rather than relying on another test
     having configured the engine first (which made them order-dependent).
     """
@@ -46,7 +46,7 @@ def jobs_db():
 
 
 def test_jobs_create_update_get_and_terminal_stamp(jobs_db):
-    import core.jobs as jobs_mod
+    import api.jobs as jobs_mod
 
     job_id = jobs_mod.create_job("Wavelets", "Intro", "notes.pdf")
     record = jobs_mod.get_job(job_id)
@@ -77,7 +77,7 @@ def test_jobs_create_update_get_and_terminal_stamp(jobs_db):
 
 
 def test_jobs_update_unknown_id_is_noop(jobs_db):
-    import core.jobs as jobs_mod
+    import api.jobs as jobs_mod
 
     jobs_mod.update_job("nope", {"status": "done"})  # must not raise
     assert jobs_mod.get_job("nope") is None
@@ -86,7 +86,7 @@ def test_jobs_update_unknown_id_is_noop(jobs_db):
 def test_jobs_prune_drops_stale_finished_jobs(jobs_db):
     from datetime import UTC, datetime, timedelta
 
-    import core.jobs as jobs_mod
+    import api.jobs as jobs_mod
     from db.models import IngestJob
     from db.session import get_session
 

@@ -24,9 +24,9 @@ from api.deps import (
     _scoped_read_owner,
     require_api_key,
 )
+from api.jobs import create_answer_job, get_answer_job, update_job
 from api.schemas import AskRequest, AskResponse
 from core.errors import friendly_llm_error_message, raise_friendly_llm_error
-from core.jobs import create_answer_job, get_answer_job, update_job
 from db.session import add_message, get_session
 
 logger = logging.getLogger("api")
@@ -284,7 +284,7 @@ def ask_async(
     ``{"job_id": ...}`` is returned immediately (HTTP 202). The client polls
     ``GET /ask/jobs/{job_id}`` to follow — or, after a refresh, re-attach to — the
     running answer. ``/ask`` and ``/ask/stream`` stay available. The job registry
-    is in-process — see the multi-worker caveat in ``core.jobs``.
+    is in-process — see the multi-worker caveat in ``api.jobs``.
     """
     with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
