@@ -54,7 +54,7 @@ error_client = TestClient(app, raise_server_exceptions=False)
 
 
 def test_500_carries_cors_header_for_allowed_origin(monkeypatch):
-    import api.main as api_main
+    from api import runtime as api_main
 
     def boom():
         raise RuntimeError("kaboom")
@@ -68,7 +68,7 @@ def test_500_carries_cors_header_for_allowed_origin(monkeypatch):
 
 
 def test_500_does_not_echo_disallowed_origin(monkeypatch):
-    import api.main as api_main
+    from api import runtime as api_main
 
     def boom():
         raise RuntimeError("kaboom")

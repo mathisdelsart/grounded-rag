@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import (
     ROLE_QUIZ,
@@ -47,10 +47,10 @@ def quiz(
     A refusal (empty ``questions``) is returned when the course does not cover the
     notion.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     try:
-        result = api_main.generate_quiz(
+        result = runtime.generate_quiz(
             request.notion,
             request.n,
             request.student_id,
@@ -97,10 +97,10 @@ def quiz_grade(
     to the question. An unknown question (or one not belonging to ``quiz_id``)
     yields 404.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     try:
-        verdict = api_main.grade_quiz_answer(
+        verdict = runtime.grade_quiz_answer(
             quiz_id,
             request.question_id,
             request.answer,
@@ -140,10 +140,10 @@ def quiz_grade_all(
     linked to the caller when authenticated). Questions that cannot be resolved are
     skipped rather than failing the whole request.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     answers = [{"question_id": a.question_id, "answer": a.answer} for a in request.answers]
-    return api_main.summarize_quiz(quiz_id, answers, request.student_id, request.rigor, openai_key)
+    return runtime.summarize_quiz(quiz_id, answers, request.student_id, request.rigor, openai_key)
 
 
 @router.get(
@@ -161,7 +161,7 @@ def quiz_review(quiz_id: int, student_id: str, user: UserOut | None = DataUser) 
     must belong to the caller (403 otherwise). An unknown or unowned quiz yields
     404.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         quiz_row = None
         if student is not None:

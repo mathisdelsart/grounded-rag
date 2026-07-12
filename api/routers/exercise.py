@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import (
     ROLE_EXERCISE,
@@ -39,10 +39,10 @@ def exercise(
     store the exercise. The persisted exercise id is surfaced so a later
     ``/grade`` call can link the grade back to it.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     try:
-        state = api_main.generate(
+        state = runtime.generate(
             {
                 "message": request.notion,
                 "student_id": request.student_id,
@@ -92,7 +92,7 @@ def exercise_review(
     ``student_id`` and, when authenticated, that student must belong to the caller
     (403 otherwise). An unknown or unowned exercise yields 404.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         ex = None
         if student is not None:

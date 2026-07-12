@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import func, select
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import DataUser, _resolve_student, _student_for_read, require_api_key
 from api.schemas import FeedbackRequest, FeedbackResponse, FeedbackSummary
@@ -28,7 +28,7 @@ def submit_feedback(request: FeedbackRequest, user: UserOut | None = DataUser) -
     new row id; an invalid ``rating`` is rejected with 422 by request
     validation. This route reaches no LLM and runs no retrieval.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _resolve_student(session, request.student_id, user)
         row = Feedback(
             student_id=student.id,
@@ -55,7 +55,7 @@ def feedback_summary(student_id: str, user: UserOut | None = DataUser) -> dict[s
     lightweight quality signal without exposing individual feedback rows. In
     require_auth mode the student must belong to the caller (403 otherwise).
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         if student is None:
             return {"up": 0, "down": 0}

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import DataUser, _scoped_read_owner, require_api_key
 from api.schemas import ChaptersResponse, CoursesResponse
@@ -26,7 +26,7 @@ def courses(student_id: str | None = None, user: UserOut | None = DataUser) -> d
     retrieval.
     """
     owner = _scoped_read_owner(student_id, user)
-    return {"courses": api_main.list_courses(owner=owner)}
+    return {"courses": runtime.list_courses(owner=owner)}
 
 
 @router.get(
@@ -47,4 +47,4 @@ def chapters(
     never reaches the LLM and runs no retrieval.
     """
     owner = _scoped_read_owner(student_id, user)
-    return {"chapters": api_main.list_chapters(course, owner=owner)}
+    return {"chapters": runtime.list_chapters(course, owner=owner)}

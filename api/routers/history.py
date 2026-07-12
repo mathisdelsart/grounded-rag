@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import DataUser, _iso_utc, _student_for_read, require_api_key
 from api.schemas import HistoryItem
@@ -28,7 +28,7 @@ def history(
     An unknown student yields an empty history rather than an error. In
     require_auth mode the student must belong to the caller (403 otherwise).
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         if student is None:
             return []
@@ -60,7 +60,7 @@ def clear_history(
     idempotent style of the other delete routes. In require_auth mode the student
     must belong to the caller (403 otherwise).
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, student_id, user)
         if student is None:
             return {"deleted": 0}

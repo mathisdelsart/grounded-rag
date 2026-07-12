@@ -318,7 +318,7 @@ try:
     from sqlalchemy import create_engine
     from sqlalchemy.pool import StaticPool
 
-    import api.main as api_main
+    from api import runtime as api_main
     from api.main import app
 except ImportError:  # pragma: no cover - exercised only without the api extra
     _HAS_API = False

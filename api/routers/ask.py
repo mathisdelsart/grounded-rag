@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import (
     DataUser,
@@ -54,10 +54,10 @@ def ask(
     # front so a foreign student id is rejected with 403 *before* any retrieval
     # or LLM work runs, mirroring ``/ask/stream``. The block below re-resolves to
     # persist the turn; by then the student is owned, so that call is a no-op.
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     try:
-        result = api_main.answer(
+        result = runtime.answer(
             request.question,
             k=request.k,
             course=request.course,
@@ -69,7 +69,7 @@ def ask(
     except Exception as exc:
         raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
         raise
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _resolve_student(session, request.student_id, user)
         thread_id = _resolve_session_id(session, student.id, request.session_id)
         add_message(
@@ -109,7 +109,7 @@ def _stream_ask_events(
     """
     final_answer = REFUSAL_FALLBACK
     try:
-        for event in api_main.stream_answer(
+        for event in runtime.stream_answer(
             request.question,
             k=request.k,
             course=request.course,
@@ -139,7 +139,7 @@ def _stream_ask_events(
         yield f"data: {json.dumps({'type': 'error', 'message': message})}\n\n"
         return
 
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _resolve_student(session, request.student_id, user)
         thread_id = _resolve_session_id(session, student.id, request.session_id)
         add_message(
@@ -176,7 +176,7 @@ def ask_stream(
     # rather than after the answer has already been emitted. The generator
     # re-resolves at the end to persist the turn; by then the student is owned,
     # so that call is a no-op link.
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     return StreamingResponse(
         _stream_ask_events(request, user, openai_key),
@@ -206,7 +206,7 @@ def _run_answer_job(
     sources: list[str] = []
     citations: list[dict[str, Any]] = []
     try:
-        for event in api_main.stream_answer(
+        for event in runtime.stream_answer(
             request.question,
             k=request.k,
             course=request.course,
@@ -231,7 +231,7 @@ def _run_answer_job(
                 sources = event.get("sources", [])
                 citations = event.get("citations", [])
 
-        with get_session(api_main._engine) as session:
+        with get_session(runtime._engine) as session:
             student = _resolve_student(session, request.student_id, user)
             thread_id = _resolve_session_id(session, student.id, request.session_id)
             add_message(
@@ -286,7 +286,7 @@ def ask_async(
     running answer. ``/ask`` and ``/ask/stream`` stay available. The job registry
     is in-process — see the multi-worker caveat in ``core.jobs``.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         _resolve_student(session, request.student_id, user)
     job_id = create_answer_job(request.student_id, request.question)
     threading.Thread(

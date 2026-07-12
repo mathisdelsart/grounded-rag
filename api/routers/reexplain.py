@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
-import api.main as api_main
 from agent.state import TutorState, to_history
+from api import runtime
 from api.auth import UserOut
 from api.deps import DataUser, OpenAIKey, _student_for_read, require_api_key
 from api.schemas import ReexplainRequest, ReexplainResponse
@@ -49,7 +49,7 @@ def reexplain_answer(
     answer, a friendly note is returned instead of crashing. In require_auth mode
     the student must belong to the caller (403 otherwise).
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = _student_for_read(session, request.student_id, user)
         if student is None:
             return {"answer": NOTHING_TO_REEXPLAIN}
@@ -64,7 +64,7 @@ def reexplain_answer(
             "api_key": openai_key,
         }
         try:
-            rephrased = api_main.reexplain(state).get("answer", "")
+            rephrased = runtime.reexplain(state).get("answer", "")
         except Exception as exc:
             raise_friendly_llm_error(exc, used_own_key=bool(openai_key))
             raise
@@ -81,7 +81,7 @@ def _reexplain_state(request: ReexplainRequest, openai_key: str | None = None) -
     supplied) is threaded onto the state so the re-explanation runs on their own
     OpenAI model; it is transient and never persisted.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = session.scalar(select(Student).where(Student.external_id == request.student_id))
         if student is None:
             return None
@@ -116,7 +116,7 @@ def _stream_reexplain_events(
 
     final_answer = ""
     try:
-        for event in api_main.stream_reexplain(state):
+        for event in runtime.stream_reexplain(state):
             if event.get("type") == "done":
                 final_answer = event.get("answer", "")
             yield f"data: {json.dumps(event)}\n\n"
@@ -126,7 +126,7 @@ def _stream_reexplain_events(
         yield f"data: {json.dumps({'type': 'error', 'message': message})}\n\n"
         return
 
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         student = session.scalar(select(Student).where(Student.external_id == request.student_id))
         if student is not None:
             add_message(session, student_id=student.id, role="assistant", content=final_answer)

@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, status
 from sqlalchemy import select
 
-import api.main as api_main
+from api import runtime
 from api.auth import (
     CurrentUser,
     LoginRequest,
@@ -68,7 +68,7 @@ def my_students(current_user: UserOut = CurrentUser) -> list[dict[str, Any]]:
     returned, so a caller never sees another account's data or the anonymous,
     unlinked students. The list is newest-first.
     """
-    with get_session(api_main._engine) as session:
+    with get_session(runtime._engine) as session:
         rows = session.scalars(
             select(Student)
             .where(Student.user_id == current_user.id)

@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-import api.main as api_main
+from api import runtime
 from api.auth import UserOut
 from api.deps import DataUser, _scoped_read_owner, require_api_key
 from api.schemas import SourceResponse
@@ -34,7 +34,7 @@ def source(
     LLM and runs no retrieval.
     """
     owner = _scoped_read_owner(student_id, user)
-    chunk = api_main.get_source(chunk_id, owner=owner)
+    chunk = runtime.get_source(chunk_id, owner=owner)
     if chunk is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
