@@ -12,6 +12,10 @@
 ![Qdrant](https://img.shields.io/badge/vectors-Qdrant-DC244C)
 ![Tests](https://img.shields.io/badge/tests-853-blue)
 
+<a href="https://sourcio-tutor.vercel.app">
+  <img src="docs/assets/README-header.png" alt="Sourcio answering a course question with a citation to (Mathematics, Ch. 3, p.21), and refusing an out-of-course question with 'Not in the course material'." width="100%">
+</a>
+
 </div>
 
 Sourcio indexes your course material once — slides, exercise sets, summaries — into a persistent

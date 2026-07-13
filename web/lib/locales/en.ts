@@ -176,6 +176,7 @@ export const en = {
   "err.keyRejected":
     "The API key was rejected. Check that it is valid — that it has credit and access to a vision model, and that you pasted only the key itself (e.g. sk-…), not a whole “OPENAI_API_KEY=…” line.",
   "err.unsupportedFile": "Unsupported file type — upload a PDF, .md or .txt.",
+  "err.streamUnsupported": "Streaming is not available right now — try again, or reload the page.",
   "common.upToDate": "Up to date",
   "answerProgress.search": "Searching your courses",
   "answerProgress.read": "Reading the sources",

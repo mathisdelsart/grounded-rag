@@ -18,7 +18,7 @@ import { RefreshButton } from "@/components/RefreshButton";
 import { Markdown } from "@/components/Markdown";
 import { EmptyState, Skeleton } from "@/components/States";
 import { useToast } from "@/components/Toast";
-import { useT, type Locale, type TranslationKey } from "@/lib/i18n";
+import { useT, type Locale, type TranslationKey, localizeError } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 
 /** The translate function returned by ``useT`` (i18n exposes no named type). */
@@ -348,7 +348,7 @@ export function HistoryPanel({ studentId, config, active, activeSessionId }: His
       if (err instanceof ApiError && err.status === 404) {
         setMessages([]);
       } else {
-        toast.push(err instanceof Error ? err.message : t("common.requestFailed"), "error");
+        toast.push(err instanceof Error ? localizeError(t, err.message) : t("common.requestFailed"), "error");
       }
     } finally {
       setLoading(false);
@@ -371,7 +371,7 @@ export function HistoryPanel({ studentId, config, active, activeSessionId }: His
       setMessages([]);
       toast.push(t("history.cleared"), "success");
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : t("history.clearFailed"), "error");
+      toast.push(err instanceof Error ? localizeError(t, err.message) : t("history.clearFailed"), "error");
     } finally {
       setClearing(false);
     }

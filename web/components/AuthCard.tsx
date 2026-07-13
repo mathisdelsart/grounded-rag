@@ -7,7 +7,7 @@ import { Card, CardBody } from "@/components/Card";
 import { TextField, FieldShell, baseField } from "@/components/TextField";
 import { BrandMark } from "@/components/Logo";
 import { useToast } from "@/components/Toast";
-import { useT } from "@/lib/i18n";
+import { useT, localizeError } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 
 interface AuthCardProps {
@@ -89,7 +89,7 @@ export function AuthCard({ config, onLogin, onSuccess, onClose, className }: Aut
       toast.push(t("auth.signedInToast", { username: user.username }), "success");
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("auth.failed"));
+      setError(err instanceof Error ? localizeError(t, err.message) : t("auth.failed"));
     } finally {
       setLoading(false);
     }

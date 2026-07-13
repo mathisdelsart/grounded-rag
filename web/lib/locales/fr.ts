@@ -182,6 +182,8 @@ export const fr: Record<TranslationKey, string> = {
   "err.keyRejected":
     "La clé API a été rejetée. Vérifiez qu’elle est valide — qu’elle a du crédit et accès à un modèle de vision, et que vous avez collé uniquement la clé (ex. sk-…), pas toute une ligne « OPENAI_API_KEY=… ».",
   "err.unsupportedFile": "Type de fichier non pris en charge — importez un PDF, .md ou .txt.",
+  "err.streamUnsupported":
+    "Le streaming n’est pas disponible pour le moment — réessayez ou rechargez la page.",
   "common.upToDate": "À jour",
   "answerProgress.search": "Recherche dans vos cours",
   "answerProgress.read": "Lecture des sources",
