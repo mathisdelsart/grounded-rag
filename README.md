@@ -11,6 +11,7 @@
 ![Next.js](https://img.shields.io/badge/web-Next.js-000000?logo=nextdotjs&logoColor=white)
 ![Qdrant](https://img.shields.io/badge/vectors-Qdrant-DC244C)
 ![Tests](https://img.shields.io/badge/tests-853-blue)
+[![Image](https://img.shields.io/badge/ghcr.io-sourcio--api-2496ED?logo=docker&logoColor=white)](https://github.com/mathisdelsart/sourcio/pkgs/container/sourcio-api)
 
 <a href="https://sourcio-tutor.vercel.app">
   <img src="docs/assets/README-header.png" alt="Sourcio answering a course question with a citation to (Mathematics, Ch. 3, p.21), and refusing an out-of-course question with 'Not in the course material'." width="100%">
@@ -173,12 +174,34 @@ see **[docs/RUN-LOCAL.md](docs/RUN-LOCAL.md)**.
 uv sync --extra ingestion --extra agent
 docker compose up -d qdrant
 cp .env.example .env                 # then set OPENAI_API_KEY
-uv run python -m ingestion.run path/to/course.pdf --course "Wavelet Transform" --hybrid
-uv run python -m core.ask "What is a piecewise constant approximation?"
+uv run python -m ingestion.run path/to/course.pdf --course "Finance" --hybrid
+uv run python -m core.ask "What is the compound interest formula?"
 ```
 
 Run the API with `uv run uvicorn api.main:app --reload` and browse the interactive docs at
 <http://localhost:8000/docs>.
+</details>
+
+<details>
+<summary>Just want to poke at the API? Pull the published image.</summary>
+
+The serving image is published to GHCR on every tagged release — no clone, no Python, no `uv`:
+
+```bash
+docker network create sourcio
+docker run -d --name qdrant --network sourcio qdrant/qdrant
+
+docker run --rm -p 8000:8000 --network sourcio \
+  -e QDRANT_URL=http://qdrant:6333 \
+  -e OPENAI_API_KEY=sk-...                      # optional: only needed to answer
+  ghcr.io/mathisdelsart/sourcio-api:v1.0.0
+```
+
+Interactive docs at <http://localhost:8000/docs>; `/health` and `/ready` answer immediately.
+
+The image is **`linux/amd64`** — it targets the cloud hosts it is deployed to. On Apple Silicon add
+`--platform linux/amd64` and it runs under emulation (slower to boot, otherwise fine). For local
+development, the `uv` path above is the one to use.
 </details>
 
 ## Repository map
