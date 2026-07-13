@@ -125,6 +125,10 @@ const _BACKEND_ERROR_MAP: { match: string; key: TranslationKey }[] = [
   { match: "scanned or image-based PDF", key: "err.scannedNeedsKey" },
   { match: "API key was rejected", key: "err.keyRejected" },
   { match: "Unsupported file type", key: "err.unsupportedFile" },
+  // Raised client-side (lib/api/endpoints.ts) when a response carries no readable
+  // stream. Matched here for the same reason as the backend ones: it is thrown far
+  // from any component, so it cannot reach t() itself.
+  { match: "Streaming is not supported", key: "err.streamUnsupported" },
 ];
 
 /**

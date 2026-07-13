@@ -14,7 +14,7 @@ import { RefreshButton } from "@/components/RefreshButton";
 import { TextField } from "@/components/TextField";
 import { EmptyState, Skeleton } from "@/components/States";
 import { useToast } from "@/components/Toast";
-import { useT, type Locale } from "@/lib/i18n";
+import { useT, type Locale, localizeError } from "@/lib/i18n";
 import { cn } from "@/lib/cn";
 
 interface ThreadsPanelProps {
@@ -67,7 +67,7 @@ export function ThreadsPanel({
       setSessions(rows);
       setLoaded(true);
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : t("threads.loadFailed"), "error");
+      toast.push(err instanceof Error ? localizeError(t, err.message) : t("threads.loadFailed"), "error");
     } finally {
       setLoading(false);
     }
@@ -91,7 +91,7 @@ export function ThreadsPanel({
       setActiveSessionId(created.id);
       toast.push(t("threads.created"), "success");
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : t("threads.createFailed"), "error");
+      toast.push(err instanceof Error ? localizeError(t, err.message) : t("threads.createFailed"), "error");
     } finally {
       setCreating(false);
     }
@@ -109,7 +109,7 @@ export function ThreadsPanel({
       }
       toast.push(t("threads.deleted"), "success");
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : t("threads.deleteFailed"), "error");
+      toast.push(err instanceof Error ? localizeError(t, err.message) : t("threads.deleteFailed"), "error");
     } finally {
       setDeletingId(null);
     }

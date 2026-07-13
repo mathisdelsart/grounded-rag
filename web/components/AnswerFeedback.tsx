@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/Button";
 import { TextField } from "@/components/TextField";
 import { useToast } from "@/components/Toast";
-import { useT } from "@/lib/i18n";
+import { useT, localizeError } from "@/lib/i18n";
 import { sendFeedback, type ConnectionConfig, type FeedbackRating } from "@/lib/api";
 
 /** Inline thumbs-up icon. */
@@ -75,7 +75,7 @@ export function AnswerFeedback({ studentId, question, answer, config }: AnswerFe
       setDone(true);
       toast.push(t("feedback.thanks"), "success");
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : t("feedback.failed"), "error");
+      toast.push(err instanceof Error ? localizeError(t, err.message) : t("feedback.failed"), "error");
     } finally {
       setSubmitting(false);
     }

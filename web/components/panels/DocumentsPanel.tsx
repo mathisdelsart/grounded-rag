@@ -428,7 +428,7 @@ export function DocumentsPanel({
     try {
       await renameCourse(oldName, newName, config, studentId);
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : t("doc.rename.failed"), "error");
+      toast.push(err instanceof Error ? localizeError(t, err.message) : t("doc.rename.failed"), "error");
       throw err;
     }
     toast.push(t("doc.rename.success", { name: newName }), "success");
@@ -441,7 +441,7 @@ export function DocumentsPanel({
     try {
       await renameChapter(courseName, oldName, newName, config, studentId);
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : t("doc.rename.failed"), "error");
+      toast.push(err instanceof Error ? localizeError(t, err.message) : t("doc.rename.failed"), "error");
       throw err;
     }
     toast.push(t("doc.rename.success", { name: newName }), "success");
@@ -568,6 +568,14 @@ export function DocumentsPanel({
                 )}
               </div>
 
+              {/* Visually hidden, not removed: the dropzone above already renders the
+                  button, the hint and the selected file names -- all through t(), so
+                  all three follow the UI language. A visible native file input would
+                  add nothing except its own label ("No file chosen" / "Aucun fichier
+                  choisi"), which the browser renders in the OS language from a shadow
+                  DOM we can neither translate nor style. `sr-only` keeps it in the tab
+                  order and reachable by assistive tech, and the dropzone forwards
+                  clicks and Enter/Space to it. */}
               <input
                 id="doc-file"
                 ref={fileInputRef}
@@ -576,7 +584,7 @@ export function DocumentsPanel({
                 multiple
                 disabled={hasRunning}
                 onChange={(e) => acceptFiles(e.target.files)}
-                className="block w-full text-sm text-zinc-600 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3.5 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+                className="sr-only"
               />
             </div>
             {/* Single-file import keeps one shared course + chapter. A multi-file

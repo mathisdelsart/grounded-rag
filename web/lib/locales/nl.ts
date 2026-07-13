@@ -174,6 +174,8 @@ export const nl: Record<TranslationKey, string> = {
   "err.keyRejected":
     "De API-sleutel is geweigerd. Controleer of hij geldig is — of hij tegoed en toegang tot een vision-model heeft, en dat je alleen de sleutel hebt geplakt (bijv. sk-…), niet een hele ‘OPENAI_API_KEY=…’-regel.",
   "err.unsupportedFile": "Niet-ondersteund bestandstype — upload een PDF, .md of .txt.",
+  "err.streamUnsupported":
+    "Streamen is momenteel niet beschikbaar — probeer opnieuw of herlaad de pagina.",
   "common.upToDate": "Bijgewerkt",
   "answerProgress.search": "Zoeken in je cursussen",
   "answerProgress.read": "De bronnen lezen",
