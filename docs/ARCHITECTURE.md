@@ -106,8 +106,17 @@ argument of the project:
   request. That guard carries the bulk of the work, and it holds — 23 refusal cases
   in the endpoint benchmark, one miss.
 
+  And a **third** guard backs it, the only one that cannot be argued with: an answer
+  that cites **no source at all** is converted to a refusal (`core/answer.py`). That
+  is not a request to the model, it is a fact about its output — zero `[n]` markers
+  means it answered from its own memory rather than from the course, so the answer
+  is dropped. It is also why the citation rate is 100% and not merely high: an
+  uncited answer cannot leave the system.
+
   Claiming the model "is never called" would be a nicer story. It is not the true
-  one, and a guarantee you have not measured is not a guarantee.
+  one, and a guarantee you have not measured is not a guarantee. The real design —
+  a cheap deterministic floor, a semantic judgement, and a deterministic backstop —
+  is stronger than the story it was replacing.
 - **Citations cannot be hallucinated.** The node sees chunk text under opaque indices
   `[1] [2] [3]`. Page numbers live in the Qdrant payload and are stitched in afterwards
   by `core/answer.py`. The model never handles a page number, so it cannot invent one.

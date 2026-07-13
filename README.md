@@ -68,8 +68,11 @@ ONLINE — answer a question
    -> embed + retrieve top-k from Qdrant, with a similarity threshold
    -> guard 1: nothing clears the threshold -> refuse, without calling the model
    -> guard 2: the model sees ONLY those chunks, and refuses if they do not
-               cover the question (the floor is coarse; this is what catches
-               a question that is merely *adjacent* to the course)
+               cover the question (the floor is coarse; this catches a question
+               merely *adjacent* to the course)
+   -> guard 3: the answer cites no source -> refuse. Not a request to the model,
+               a fact about its output: no [n] marker means it answered from its
+               own memory, not from the course
    -> otherwise -> grounded answer with citations remapped by the code
 ```
 
@@ -103,13 +106,21 @@ way the web app calls it, over six indexed chapters (finance, special relativity
 | **Retrieval hit-rate** — the passage that answers the question is retrieved | **32/32 — 100%** |
 | Query rewriting (multi-query) vs plain dense | **identical** — no gain on this corpus |
 
-**The refusal guard, honestly.** Calibration (`eval/calibrate.py`) puts in-course questions at
-**0.47–0.71** similarity and out-of-scope ones at **0.31–0.57** — the two **overlap**, so no threshold
-separates them cleanly. The similarity floor is therefore a *coarse* first guard: it stops the
-obviously unrelated, not everything. What catches a question that is merely *adjacent* to the course
-(the Sharpe ratio in a finance course, the Schwarzschild radius in a relativity course) is the second
-guard — the grounded prompt, shown only the retrieved chunks. That is where 23 of the benchmark's
-refusal cases are decided, and it missed one.
+**How the refusal actually works** — end to end, **22 of 23** out-of-scope requests were refused
+(**96%**), and that number comes from three guards, not one.
+
+Calibration (`eval/calibrate.py`) puts in-course questions at **0.47–0.71** similarity and
+out-of-scope ones at **0.31–0.57**. The two **overlap**, and that is not a tuning failure: an embedding
+measures what a text is *about*, not whether it *answers*. "How do I compute the Sharpe ratio?" **is** a
+finance question, and a chunk about variance and risk **is** finance — a high score there is the
+embedding doing its job. No threshold, and no better embedding, separates *adjacent-but-absent* from
+*covered*.
+
+So the similarity floor is a deliberately **coarse** first guard: it cheaply drops the plainly
+unrelated before any model runs. The semantic call belongs to the **second** guard, the grounded prompt,
+which is shown only the retrieved chunks. And a **third** guard backs it up, the one that cannot be
+argued with: an answer citing **no source at all** is converted into a refusal — not by asking the
+model, but by observing its output. That is why the citation rate is 100% rather than merely high.
 
 > Faithfulness (is every claim supported by its cited source?) is measured by `eval/run_eval.py`, which
 > calls an LLM judge. It is not reported here because it has not been re-run against this corpus, and a
