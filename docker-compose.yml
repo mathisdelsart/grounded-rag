@@ -4,6 +4,12 @@
 # app (`make web`) run on the host, where the local embedding model (bge-m3 via
 # torch) already lives — containerizing them locally would pull multi-gigabyte ML
 # wheels for no benefit. The production API *is* containerized; see `Dockerfile`.
+#
+# The project name is pinned. Compose otherwise derives it from the directory name,
+# so cloning into a differently-named folder would silently mint a *new*, empty
+# volume and the indexed corpus would look like it had vanished.
+name: sourcio
+
 services:
   qdrant:
     image: qdrant/qdrant:latest

@@ -131,16 +131,17 @@ def test_slide_chunk_ids_distinct_across_documents():
 # --- CLI routing: text files indexed without touching the PDF path -----------
 
 
-def test_run_routes_text_file_and_indexes_chunks(tmp_path, monkeypatch):
-    path = tmp_path / "syllabus.md"
-    path.write_text(" ".join(f"t{i}" for i in range(30)), encoding="utf-8")
+def _run_cli(path, monkeypatch, *, owner=None) -> list:
+    """Drive `run.main()` over a text file and return the chunks it indexed.
 
+    Indexing is captured rather than performed, and the PDF/vision path fails
+    loudly if it is ever reached.
+    """
     captured: list = []
 
     def fake_index(chunks, *, sparse=False):
         captured.extend(chunks)
 
-    # Capture indexing; fail loudly if the PDF/vision path is ever reached.
     monkeypatch.setattr(run, "index_chunks", fake_index)
 
     def boom_extract(*args, **kwargs):
@@ -161,11 +162,38 @@ def test_run_routes_text_file_and_indexes_chunks(tmp_path, monkeypatch):
             concurrency=4,
             sparse=False,
             batch_size=10,
+            owner=owner,
         ),
     )
 
     run.main()
+    return captured
+
+
+def test_run_routes_text_file_and_indexes_chunks(tmp_path, monkeypatch):
+    path = tmp_path / "syllabus.md"
+    path.write_text(" ".join(f"t{i}" for i in range(30)), encoding="utf-8")
+
+    captured = _run_cli(path, monkeypatch)
 
     assert captured, "expected chunks to be indexed"
     assert all(c.course == "Wavelet Transform" for c in captured)
     assert all(c.chapter == "syllabus" for c in captured)
+    # No --owner: the chunks stay owner-less, and every owner-scoped read ignores them.
+    assert all(c.owner is None for c in captured)
+
+
+def test_run_stamps_owner_on_every_chunk(tmp_path, monkeypatch):
+    """`--owner` is what makes an ingested corpus visible to an account at all.
+
+    Owner-scoped reads are strict (`core.retrieval.owner_scope_filter`), so a chunk
+    that misses the stamp is retrievable by nobody — the corpus indexes cleanly and
+    then answers nothing.
+    """
+    path = tmp_path / "syllabus.md"
+    path.write_text(" ".join(f"t{i}" for i in range(30)), encoding="utf-8")
+
+    captured = _run_cli(path, monkeypatch, owner="u4")
+
+    assert captured, "expected chunks to be indexed"
+    assert all(c.owner == "u4" for c in captured)

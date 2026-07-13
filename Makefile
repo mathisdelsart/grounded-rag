@@ -7,7 +7,7 @@ SHELL := /bin/sh
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install local-install local qdrant hooks lint fmt fmt-check test check api web dev eval eval-report bench ingest ingest-prod ask up down clean reset-db
+.PHONY: help install local-install local qdrant hooks lint fmt fmt-check test check api web dev eval eval-report bench ingest ingest-bench ingest-prod ask up down clean reset-db
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Available targets:\n"} \
@@ -94,8 +94,20 @@ bench: ## Run the endpoint benchmark against a live deployment
 
 # Ingest a PDF into the local Qdrant.
 # Usage: make ingest PDF=path/to/file.pdf COURSE="Course Name"
-ingest: ## Ingest a PDF into local Qdrant (vars: PDF=..., COURSE="...")
-	uv run python -m ingestion.run $(PDF) --course "$(COURSE)"
+# Add OWNER=u4 to ingest into an account; without it the material is owner-less
+# and every owner-scoped read (the API, `make eval`) ignores it. See ingestion/run.py.
+ingest: ## Ingest a PDF into local Qdrant (vars: PDF=..., COURSE="...", OWNER=...)
+	uv run python -m ingestion.run $(PDF) --course "$(COURSE)" $(if $(OWNER),--owner $(OWNER))
+
+# Ingest the six benchmark chapters (eval/corpus/) into the account the eval scopes
+# to, so `make eval` measures the corpus dataset.jsonl was written against. Idempotent:
+# chunk ids are stable, so re-running overwrites rather than duplicates.
+ingest-bench: ## Ingest the benchmark corpus into local Qdrant (var: OWNER=u4)
+	@for f in eval/corpus/*.pdf; do \
+		case "$$f" in *finance*) c="Finance";; *) c="Special Relativity";; esac; \
+		echo "==> $$f -> $$c (owner $(OWNER))"; \
+		uv run python -m ingestion.run "$$f" --course "$$c" --owner $(OWNER) --hybrid || exit 1; \
+	done
 
 # Ingest a PDF into the PRODUCTION Qdrant Cloud, loading prod-only credentials
 # from .env.prod (gitignored, kept out of the repo). Deliberately separate from

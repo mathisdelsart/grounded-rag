@@ -153,6 +153,10 @@ The fastest path is fully local and free (LLM via Ollama). Requires Docker, [`uv
 Node.js 18+, and a running [Ollama](https://ollama.com) server.
 
 ```bash
+git clone https://github.com/mathisdelsart/sourcio.git && cd sourcio
+make install                      # Python deps into .venv (uv sync)
+cp .env.example .env              # every value has a default; the Ollama path needs no API key
+
 # 1. Vector store (Docker)
 docker compose up -d qdrant
 
@@ -166,6 +170,14 @@ make web
 Open <http://localhost:3000>, ask an in-course question (grounded, cited) and an out-of-course one
 (honest refusal). For the full recipe — pulling models, ingesting a course, resetting the dev DB —
 see **[docs/RUN-LOCAL.md](docs/RUN-LOCAL.md)**.
+
+That is the whole setup: `make web` installs the frontend deps on first run, and the dev database
+(`app.db`) is created on the first API start. Two optional extras:
+
+```bash
+make ingest-bench                 # index the six benchmark chapters, so `make eval` reproduces the Results above
+make hooks                        # pre-commit hooks mirroring CI (contributors)
+```
 
 <details>
 <summary>Prefer the CLI / OpenAI?</summary>

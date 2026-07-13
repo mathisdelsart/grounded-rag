@@ -22,7 +22,9 @@ class Page:
     document: str | None = None
     # Owner of the material: the effective ``student_id`` (``u<id>`` when logged in,
     # the device id when anonymous). ``None`` for material ingested without an owner
-    # (CLI, or the legacy shared corpus), which stays visible to everyone.
+    # (the CLI default, or the legacy corpus). Owner-less material is matched by *no*
+    # account: ``core.retrieval.owner_scope_filter`` is strict, so an owner-scoped
+    # read never returns it. Pass ``--owner`` to ingest into an account.
     owner: str | None = None
 
 
@@ -39,7 +41,7 @@ class Chunk:
     # source document is unknown (CLI ingestion), preserving the legacy chunk id.
     document: str | None = None
     # Owner of the chunk (see :class:`Page.owner`). ``None`` for owner-less material,
-    # which is treated as shared/legacy and stays visible to every account.
+    # which is invisible to every owner-scoped read (strict isolation, no shared branch).
     owner: str | None = None
 
 
