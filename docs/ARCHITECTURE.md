@@ -352,7 +352,7 @@ product-side grading of a student's answer.
 | Where | What |
 | --- | --- |
 | **Qdrant** | course chunks as `{vector, payload}` (collection `courses`) |
-| **SQL** (SQLite in dev, PostgreSQL later) | users, students, exercises + reference solutions, grades, quizzes, conversation messages, threads, feedback, spaced-repetition reviews |
+| **SQL** (SQLite in dev, managed PostgreSQL in production) | users, students, exercises + reference solutions, grades, quizzes, conversation messages, threads, feedback, spaced-repetition reviews |
 | **LangFuse** (optional) | traces and per-step evaluation signals |
 
 The relational layer uses SQLAlchemy 2.0 declarative models (`db/models.py`):
@@ -377,8 +377,9 @@ The relational layer uses SQLAlchemy 2.0 declarative models (`db/models.py`):
   notion)`, advanced by the SM-2 scheduler.
 
 The engine is created lazily from `Settings.database_url` (`db/session.py`), so
-swapping SQLite for PostgreSQL is just a URL change — see
-[OPERATIONS.md](OPERATIONS.md). Schema migrations are managed by Alembic
+swapping SQLite for PostgreSQL is just a URL change — which is exactly how the
+deployed instance runs, since a container's SQLite file would not survive a
+restart. See [OPERATIONS.md](OPERATIONS.md). Schema migrations are managed by Alembic
 (`alembic/`), which resolves the same URL at runtime and diffs against the
 declarative `Base`.
 
