@@ -500,8 +500,10 @@ def test_delete_documents_course_only(monkeypatch):
     _use_client(monkeypatch, _DeleteClient)
     deleted = documents_mod.delete_documents("Wavelets", None, "uA")
     assert deleted == 4
-    # course condition + the strict owner-scope sub-filter (no chapter).
-    assert len(_DeleteClient.last_count_filter.must) == 2
+    # Assert on the filter that actually DELETES, not the last one counted: the
+    # orphan-original cleanup counts again afterwards, and what matters is what was
+    # removed. Course condition + the strict owner-scope sub-filter (no chapter).
+    assert len(_DeleteClient.last_delete_selector.filter.must) == 2
 
 
 def test_delete_documents_course_and_chapter(monkeypatch):
@@ -509,7 +511,7 @@ def test_delete_documents_course_and_chapter(monkeypatch):
     deleted = documents_mod.delete_documents("Wavelets", "Intro", "uA")
     assert deleted == 4
     # course + chapter + the strict owner-scope sub-filter.
-    assert len(_DeleteClient.last_count_filter.must) == 3
+    assert len(_DeleteClient.last_delete_selector.filter.must) == 3
 
 
 def test_delete_documents_fail_closed_without_owner(monkeypatch):
@@ -1444,3 +1446,134 @@ def test_rename_route_requires_a_rename(client):
 def test_rename_route_requires_student_id(client):
     response = client.post("/documents/rename", json={"course": "C", "new_course": "N"})
     assert response.status_code == 422
+
+
+# --- deleting a course must delete its stored originals too -----------------
+# Chunks and files are two halves of one document. Deleting only the chunks leaves
+# a file nobody can reach: a bill for storage no one can use, and -- for a user's
+# own course material -- documents retained after they asked for them to be gone.
+
+
+class _OrphanClient:
+    """Counts by filter, so a chapter delete can leave a file still in use.
+
+    `counts` maps a *document* payload value to how many points still cite it after
+    the delete. A scoped count with no document condition reports the course total.
+    """
+
+    def __init__(self, *, course_total: int, per_document: dict[str, int], docs: list[str]):
+        self.course_total = course_total
+        self.per_document = per_document
+        self.docs = docs
+
+    def count(self, *, collection_name, count_filter, exact):  # noqa: ARG002
+        for cond in count_filter.must:
+            key = getattr(cond, "key", None)
+            if key == "document":
+                name = cond.match.value
+                return SimpleNamespace(count=self.per_document.get(name, 0))
+        return SimpleNamespace(count=self.course_total)
+
+    def delete(self, *, collection_name, points_selector):  # noqa: ARG002
+        pass
+
+    def scroll(self, **kwargs):  # noqa: ARG002
+        return [SimpleNamespace(payload={"document": d}) for d in self.docs], None
+
+
+def _r2_spy(monkeypatch):
+    """Pretend R2 is configured and record what would be deleted from it."""
+    calls: dict[str, list] = {"objects": [], "prefixes": []}
+    monkeypatch.setattr(documents_mod.storage, "configured", lambda: True)
+    monkeypatch.setattr(
+        documents_mod.storage, "delete_object", lambda key: calls["objects"].append(key)
+    )
+    monkeypatch.setattr(
+        documents_mod.storage, "delete_prefix", lambda p: calls["prefixes"].append(p) or 0
+    )
+    return calls
+
+
+def test_deleting_a_whole_course_removes_its_originals(monkeypatch, tmp_path):
+    """Nothing of the course is left, so the directory and the R2 prefix both go."""
+    monkeypatch.setattr(documents_mod, "UPLOADS_DIR", str(tmp_path))
+    course_dir = tmp_path / documents_mod._slug("Finance")
+    course_dir.mkdir(parents=True)
+    (course_dir / "finance_ch1.pdf").write_bytes(b"%PDF-1")
+    calls = _r2_spy(monkeypatch)
+
+    client = _OrphanClient(course_total=0, per_document={}, docs=["finance_ch1.pdf"])
+    _use_client(monkeypatch, lambda *a, **k: client)
+
+    documents_mod.delete_documents("Finance", None, "uA")
+
+    assert not course_dir.exists(), "the course directory must not survive the course"
+    assert calls["prefixes"] == [documents_mod._slug("Finance") + "/"]
+
+
+def test_deleting_a_chapter_keeps_a_file_its_other_chapters_still_cite(monkeypatch, tmp_path):
+    """A PDF spanning two chapters survives the deletion of one of them.
+
+    This is the case a naive "delete the course folder" implementation gets wrong,
+    and it destroys material the user did not ask to remove.
+    """
+    monkeypatch.setattr(documents_mod, "UPLOADS_DIR", str(tmp_path))
+    course_dir = tmp_path / documents_mod._slug("Finance")
+    course_dir.mkdir(parents=True)
+    shared = course_dir / "whole_course.pdf"
+    shared.write_bytes(b"%PDF-1")
+    calls = _r2_spy(monkeypatch)
+
+    # The course still has points, and 5 of them still cite whole_course.pdf.
+    client = _OrphanClient(
+        course_total=5, per_document={"whole_course.pdf": 5}, docs=["whole_course.pdf"]
+    )
+    _use_client(monkeypatch, lambda *a, **k: client)
+
+    documents_mod.delete_documents("Finance", "Chapter 1", "uA")
+
+    assert shared.exists(), "a file the surviving chapters still cite must not be deleted"
+    assert calls["objects"] == [] and calls["prefixes"] == []
+
+
+def test_deleting_a_chapter_removes_a_file_nothing_cites_any_more(monkeypatch, tmp_path):
+    """The chapter's own PDF has no surviving chunk, so it is an orphan and goes."""
+    monkeypatch.setattr(documents_mod, "UPLOADS_DIR", str(tmp_path))
+    course_dir = tmp_path / documents_mod._slug("Finance")
+    course_dir.mkdir(parents=True)
+    gone = course_dir / "finance_ch1.pdf"
+    gone.write_bytes(b"%PDF-1")
+    kept = course_dir / "finance_ch2.pdf"
+    kept.write_bytes(b"%PDF-1")
+    calls = _r2_spy(monkeypatch)
+
+    # The course survives (ch2 remains), but nothing cites finance_ch1.pdf now.
+    client = _OrphanClient(
+        course_total=4, per_document={"finance_ch1.pdf": 0}, docs=["finance_ch1.pdf"]
+    )
+    _use_client(monkeypatch, lambda *a, **k: client)
+
+    documents_mod.delete_documents("Finance", "Chapter 1", "uA")
+
+    assert not gone.exists(), "an original no chunk refers to any more must be removed"
+    assert kept.exists(), "the other chapter's file is untouched"
+    assert calls["objects"] == [documents_mod._r2_key("Finance", "finance_ch1.pdf")]
+
+
+def test_storage_failure_does_not_fail_the_delete(monkeypatch, tmp_path):
+    """The points are already gone; a storage hiccup must not report failure.
+
+    The cost of that choice is an orphan left behind rather than an error raised,
+    which is the right trade for a secondary cleanup -- but it is a real trade.
+    """
+    monkeypatch.setattr(documents_mod, "UPLOADS_DIR", str(tmp_path))
+    monkeypatch.setattr(documents_mod.storage, "configured", lambda: True)
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("R2 unreachable")
+
+    monkeypatch.setattr(documents_mod.storage, "delete_prefix", _boom)
+    client = _OrphanClient(course_total=0, per_document={}, docs=[])
+    _use_client(monkeypatch, lambda *a, **k: client)
+
+    assert documents_mod.delete_documents("Finance", None, "uA") == 0  # count() says 0 left

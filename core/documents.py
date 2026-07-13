@@ -26,6 +26,7 @@ The Qdrant client is built from settings, matching ``core.courses`` and
 import contextlib
 import os
 import re
+import shutil
 import time
 from collections.abc import Iterator
 from typing import Any
@@ -576,6 +577,12 @@ def delete_documents(course: str, chapter: str | None = None, owner: str | None 
     every account's points for that course. Returns the number of points removed;
     a missing collection or any error yields ``0`` rather than raising, so the
     endpoint degrades gracefully.
+
+    The stored **originals** are removed too, once nothing references them any
+    more (:func:`_delete_orphaned_originals`). Chunks and files are two halves of
+    one document: deleting only the chunks leaves a file nobody can reach, which
+    is both a bill for storage no one can use and — for a user's own course
+    material — retaining documents after they asked for them to be deleted.
     """
     # Fail closed: with no owner there is no caller to scope to, so delete nothing
     # rather than wiping every account's points for the course. The API always
@@ -591,25 +598,96 @@ def delete_documents(course: str, chapter: str | None = None, owner: str | None 
     client = client_from_settings()
     collection = settings.qdrant_collection
 
-    conditions: list[Any] = [FieldCondition(key="course", match=MatchValue(value=course))]
+    def _scope(*extra: Any) -> Any:
+        """Owner + course, plus whatever else the caller pins."""
+        return Filter(
+            must=[
+                FieldCondition(key="course", match=MatchValue(value=course)),
+                owner_scope_filter(owner),
+                *extra,
+            ]
+        )
+
+    conditions: list[Any] = []
     if chapter is not None:
         conditions.append(FieldCondition(key="chapter", match=MatchValue(value=chapter)))
-    # Strictly scope to the caller's own points: another account's OWNED points and
-    # the owner-less legacy corpus never match, so neither can be deleted here.
-    conditions.append(owner_scope_filter(owner))
-    payload_filter = Filter(must=conditions)
+    payload_filter = _scope(*conditions)
 
     try:
         matched = client.count(
             collection_name=collection, count_filter=payload_filter, exact=True
         ).count
+        # Which source files are these points from? Read it BEFORE the delete --
+        # afterwards the payloads are gone and the link is unrecoverable.
+        doomed = {
+            p["document"]
+            for p in iter_point_payloads(
+                client, collection, payload_filter, with_payload=["document"]
+            )
+            if p.get("document")
+        }
         client.delete(
             collection_name=collection,
             points_selector=FilterSelector(filter=payload_filter),
         )
     except Exception:
         return 0
+
+    _delete_orphaned_originals(client, collection, course, owner, doomed, _scope)
     return matched
+
+
+def _delete_orphaned_originals(
+    client: Any,
+    collection: str,
+    course: str,
+    owner: str,
+    doomed: set[str],
+    scope: Any,
+) -> None:
+    """Remove stored originals that no surviving chunk refers to any more.
+
+    A file is deleted only when **zero** chunks still point at it. That matters for
+    a chapter delete: one PDF can span several chapters, so removing one chapter
+    must not remove a file the remaining chapters are still citing. Asking Qdrant
+    what survived is the only reliable way to know — the filename alone does not
+    say which chapters it covers.
+
+    When the whole course is gone, its directory and R2 prefix are removed
+    wholesale, which also sweeps up anything uploaded but never successfully
+    ingested (a failed import leaves a file and no chunks, so it has no chunk to
+    be orphaned *by*).
+
+    Best-effort throughout: the points are already deleted by the time this runs,
+    and a storage failure must not turn a successful delete into a failed request.
+    """
+    from qdrant_client.models import FieldCondition, MatchValue
+
+    with contextlib.suppress(Exception):
+        remaining = client.count(collection_name=collection, count_filter=scope(), exact=True).count
+
+        if remaining == 0:
+            # Nothing of this course is left: drop the whole directory and prefix.
+            shutil.rmtree(_course_dir(course), ignore_errors=True)
+            if storage.configured():
+                storage.delete_prefix(_slug(course) + "/")
+            return
+
+        # A chapter went, the course stayed. Delete only the files nothing cites.
+        for name in doomed:
+            still_used = client.count(
+                collection_name=collection,
+                count_filter=scope(FieldCondition(key="document", match=MatchValue(value=name))),
+                exact=True,
+            ).count
+            if still_used:
+                continue
+            path = _safe_join(_course_dir(course), name)
+            if path is not None:
+                with contextlib.suppress(OSError):
+                    os.remove(path)
+            if storage.configured():
+                storage.delete_object(_r2_key(course, name))
 
 
 def _set_payload_scoped(

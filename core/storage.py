@@ -164,3 +164,41 @@ def copy_prefix(old_prefix: str, new_prefix: str) -> None:
                 Bucket=bucket, CopySource={"Bucket": bucket, "Key": key}, Key=new_key
             )
             client.delete_object(Bucket=bucket, Key=key)
+
+
+def delete_object(key: str) -> None:
+    """Best-effort delete of a single object. Never raises.
+
+    Deleting a key that does not exist is not an error in S3/R2, so this is
+    idempotent: re-deleting an already-deleted original is a no-op rather than a
+    failure.
+    """
+    with contextlib.suppress(Exception):
+        settings = get_settings()
+        _client().delete_object(Bucket=settings.r2_bucket, Key=key)
+
+
+def delete_prefix(prefix: str) -> int:
+    """Best-effort delete of every object under ``prefix``. Returns how many.
+
+    Used when a whole course is removed: its originals are no longer reachable
+    from anywhere in the product, so leaving them in the bucket would mean paying
+    to store files nobody can open -- and, for personal course material, retaining
+    a user's documents after they asked for them to be deleted.
+
+    Never raises, for the same reason as :func:`copy_prefix`: the Qdrant points
+    are already gone by the time this runs, and a storage hiccup must not turn a
+    successful delete into a failed request. The cost of that choice is that a
+    failure here leaves an orphan rather than reporting it, which is the right
+    trade for a secondary cleanup but is worth stating.
+    """
+    deleted = 0
+    with contextlib.suppress(Exception):
+        settings = get_settings()
+        client = _client()
+        for key in list_keys(prefix):
+            if not key.startswith(prefix):
+                continue  # defensive: list_keys is already scoped to the prefix
+            client.delete_object(Bucket=settings.r2_bucket, Key=key)
+            deleted += 1
+    return deleted
