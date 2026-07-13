@@ -117,7 +117,8 @@ Retrieval boosters, measured separately on a slide deck: a cross-encoder reranke
 ## Tech stack
 
 **Backend** Python · FastAPI · LangChain / LangGraph · SQLAlchemy + Alembic
-**Retrieval** Qdrant · `BAAI/bge-m3` local embeddings · cross-encoder reranker
+**Storage** Qdrant (vectors) · SQLite locally, managed PostgreSQL in production (accounts, history)
+**Retrieval** `BAAI/bge-m3` local embeddings · cross-encoder reranker
 **Frontend** Next.js (App Router) · TypeScript · Tailwind CSS
 **Ops** Docker · GitHub Actions (ruff · pytest · pyright · coverage) · LangFuse (opt-in)
 

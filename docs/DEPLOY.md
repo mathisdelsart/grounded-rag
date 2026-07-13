@@ -124,13 +124,21 @@ installed via the Docker image, so you do not install it by hand.
 
    The Space's public URL is the API base URL used by the frontend.
 
-> **Persistence:** the default SQLite database lives inside the container and is
-> reset when the Space rebuilds or sleeps, so accounts and history are **ephemeral**
-> on the free tier. Grounded answers, exercises and grading still work (the course
-> lives in Qdrant), but users lose their logins. For durable data, point
-> `DATABASE_URL` at a managed Postgres — see [OPERATIONS.md](OPERATIONS.md).
-> Uploaded file originals are likewise ephemeral on local disk in production; make
-> them durable with Cloudflare R2 — see [Durable file storage](#durable-file-storage-cloudflare-r2).
+> **Persistence — set `DATABASE_URL`, or accounts will not survive.** A Space's
+> filesystem is ephemeral: the default SQLite file lives *inside the container* and
+> is wiped whenever the Space rebuilds or wakes from sleep. Grounded answers,
+> exercises and grading keep working (the course lives in Qdrant, which is external),
+> but every account and conversation is gone. Point `DATABASE_URL` at a **managed
+> Postgres** — that is what the reference deployment runs on, and it is a one-line
+> env change, not a code change: the ORM already speaks SQLAlchemy and the driver
+> already ships in the image. See [OPERATIONS.md](OPERATIONS.md).
+>
+> The symptom is deceptive: right after a deploy everything looks durable, because
+> the container has not restarted yet. The data only disappears at the *next*
+> rebuild or sleep/wake cycle.
+>
+> Uploaded file originals are ephemeral for the same reason; make them durable with
+> Cloudflare R2 — see [Durable file storage](#durable-file-storage-cloudflare-r2).
 
 > Free CPU Spaces sleep when idle and cold-start on the next request; the first call
 > after a nap is slow while the embedding model loads. Expected on the free tier.
@@ -274,7 +282,7 @@ provider key are required for a minimal run; the rest are opt-in.
 | `GROQ_API_KEY` | yes (`LLM_PROVIDER=groq`) | Key for the free hosted Groq LLM. |
 | `OLLAMA_BASE_URL` | no | Ollama server URL when `LLM_PROVIDER=ollama` (default `http://localhost:11434`). |
 | `LLM_<ROLE>` | no | Per-role model override (e.g. `LLM_GENERATE=gpt-4o`), provider prefix allowed. |
-| `DATABASE_URL` | no | Relational store (default `sqlite:///./app.db`; a `postgresql+psycopg://` URL for persistence — see [OPERATIONS.md](OPERATIONS.md)). |
+| `DATABASE_URL` | **yes (any real deployment)** | Relational store. Defaults to `sqlite:///./app.db`, which is *ephemeral inside a container* — use a `postgresql+psycopg://` URL so accounts and history survive a restart. See [OPERATIONS.md](OPERATIONS.md). |
 | `REQUIRE_AUTH` | yes (public) | `true` forces a valid JWT on every data endpoint and isolates each account. Leave unset only for a private/local instance. |
 | `JWT_SECRET` | yes (`REQUIRE_AUTH=true`) | Strong random secret used to sign auth tokens. The app refuses to boot with a weak/default value when auth is on. |
 | `CORS_ORIGINS` | yes (browser client) | Comma-separated allowed origins (e.g. the Vercel web URL); the browser app cannot call the API without it. |

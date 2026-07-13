@@ -9,23 +9,41 @@ For cloud deployment and the Cloudflare R2 durable-upload option, see
 
 ---
 
-## PostgreSQL backend (optional)
+## PostgreSQL backend
 
-The relational store (students, generated exercises with their reference
+Optional locally, **required for any real deployment.**
+
+The relational store (users, students, generated exercises with their reference
 solutions, grades, and conversation history) is accessed through SQLAlchemy and
 driven entirely by the `DATABASE_URL` setting. The default is local SQLite, which
-needs no setup:
+needs no setup and is the right choice for development:
 
 ```
 DATABASE_URL=sqlite:///./app.db   # default; nothing to install
 ```
 
-PostgreSQL is a drop-in alternative for shared or production deployments (on the
-free HF Space, SQLite is ephemeral — a rebuild or idle sleep wipes accounts and
-history, so a managed Postgres is what makes them durable). The ORM models use
-only portable column types, so no migration rewrite is needed: install the
-driver, run a Postgres instance, point `DATABASE_URL` at it, and apply the
-existing Alembic migrations.
+That default does not survive a deployment. A container's filesystem is ephemeral,
+so the SQLite file — and with it every account and conversation — is wiped on the
+next rebuild or sleep/wake cycle. A managed Postgres is what makes them durable,
+and it is what the reference deployment runs on.
+
+Switching is a URL change, not a code change: the ORM models use only portable
+column types, and the driver already ships in the Docker image. Point
+`DATABASE_URL` at a managed instance ([Neon](https://neon.tech) and
+[Supabase](https://supabase.com) both have a free tier) and the tables are created
+on first boot. Alembic then handles any later schema change without dropping the
+existing rows.
+
+> **URL format.** Providers hand you a `postgresql://…` string; this app wants the
+> psycopg 3 driver, so insert `+psycopg`:
+>
+> ```
+> postgresql://user:pass@host/db        ->  provider's string
+> postgresql+psycopg://user:pass@host/db  ->  what DATABASE_URL needs
+> ```
+>
+> Keep the provider's query parameters (`?sslmode=require`, and Neon's pooled
+> `-pooler` host, which is the one to use for a containerized app).
 
 ### 1. Install the driver
 
