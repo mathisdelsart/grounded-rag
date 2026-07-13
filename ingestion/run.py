@@ -9,7 +9,7 @@ pipeline (slides). Markdown (`.md`) and text (`.txt`) files are plain prose:
 they are read straight from disk as UTF-8 and split into overlapping prose
 windows -- no PyMuPDF, no vision model, no network. PDF-only flags (`--pages`,
 `--max-pages`, `--dpi`, `--hybrid`, `--concurrency`) are no-ops for text inputs;
-`--course`, `--sparse` and `--batch-size` apply to both.
+`--course`, `--owner`, `--sparse` and `--batch-size` apply to both.
 
 Pages are processed in batches (extract -> chunk -> index per batch) so a crash
 mid-run keeps the progress of earlier batches instead of losing everything. Chunk
@@ -65,7 +65,21 @@ def _format_pages(pages: list[int]) -> str:
     return ", ".join(str(p) for p in pages)
 
 
-def _index_text_file(path: str, course: str, *, sparse: bool, batch_size: int) -> int:
+def _stamp_owner(pages: list[Page], owner: str | None) -> list[Page]:
+    """Stamp `owner` on every page so the chunks land in that account's scope.
+
+    Owner-scoped reads are strict (`core.retrieval.owner_scope_filter`), so pages
+    left owner-less are retrievable by nobody. A no-op when `owner` is None.
+    """
+    if owner is not None:
+        for page in pages:
+            page.owner = owner
+    return pages
+
+
+def _index_text_file(
+    path: str, course: str, *, sparse: bool, batch_size: int, owner: str | None = None
+) -> int:
     """Ingest a `.md`/`.txt` prose file: load -> chunk -> index in batches.
 
     The whole file is read once and split into prose windows (`Page`s); those
@@ -74,7 +88,7 @@ def _index_text_file(path: str, course: str, *, sparse: bool, batch_size: int) -
     PDF-only options (pages/dpi/vision/concurrency) do not apply here. Returns
     the total number of indexed chunks.
     """
-    pages: list[Page] = load_text_file(path, course)
+    pages: list[Page] = _stamp_owner(load_text_file(path, course), owner)
     if not pages:
         print(f"No content extracted from {path!r}; nothing to ingest.")
         return 0
@@ -136,6 +150,14 @@ def main() -> None:
         help="Pages per extract->chunk->index batch. Indexing each batch as it "
         "is produced keeps prior progress if the run crashes mid-way.",
     )
+    parser.add_argument(
+        "--owner",
+        default=None,
+        help="Ingest into an account, e.g. --owner u4. Owner-scoped reads (the API, "
+        "and `make eval OWNER=...`) are strict: material ingested without this flag "
+        "is retrievable by no account. Omit it only for a throwaway local corpus "
+        "queried through the unscoped offline path.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -147,7 +169,11 @@ def main() -> None:
     # PDF-only flags (pages/dpi/hybrid/concurrency are no-ops here).
     if is_text_file(args.pdf):
         total_chunks = _index_text_file(
-            args.pdf, args.course, sparse=args.sparse, batch_size=args.batch_size
+            args.pdf,
+            args.course,
+            sparse=args.sparse,
+            batch_size=args.batch_size,
+            owner=args.owner,
         )
         if total_chunks:
             print(f"Ingested {total_chunks} chunks from {args.pdf!r} into course {args.course!r}.")
@@ -164,13 +190,16 @@ def main() -> None:
     total_chunks = 0
     for batch_no, batch_pages in enumerate(batches, start=1):
         logger.info("batch %d/%d: pages %s", batch_no, len(batches), _format_pages(batch_pages))
-        pages = extract_pdf(
-            args.pdf,
-            args.course,
-            dpi=args.dpi,
-            pages=batch_pages,
-            hybrid=args.hybrid,
-            concurrency=args.concurrency,
+        pages = _stamp_owner(
+            extract_pdf(
+                args.pdf,
+                args.course,
+                dpi=args.dpi,
+                pages=batch_pages,
+                hybrid=args.hybrid,
+                concurrency=args.concurrency,
+            ),
+            args.owner,
         )
         chunks = chunk_pages(pages)
         index_chunks(chunks, sparse=args.sparse)

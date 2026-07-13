@@ -7,9 +7,22 @@ product-side grading of a student's answer. It runs locally and in CI (via
 ## One corpus
 
 Everything here is measured against the **same six chapters**: Finance (ch. 1-3)
-and Relativity (ch. 1-3), the documents in `uploads/bench/`. There is one dataset
+and Relativity (ch. 1-3), the documents in [`corpus/`](corpus/). There is one dataset
 (`dataset.jsonl`) and one case list (`live_eval_cases.json`); a metric you read
 here and a metric you read there describe the same material.
+
+The six PDFs are committed. They are short LaTeX study notes written for this
+benchmark, not third-party course material, and every number in `dataset.jsonl` is
+checkable against them — so a clone can reproduce the published results instead of
+taking them on faith. Index them once, into the account the eval scopes to:
+
+```bash
+make ingest-bench          # eval/corpus/*.pdf -> Qdrant, owner u4
+make eval                  # same OWNER (u4) by default
+```
+
+`--owner` is not optional here: owner-scoped reads are strict, so a corpus ingested
+without it is retrievable by no account and every answerable case scores as a refusal.
 
 That is deliberate. The harness previously ran against corpora that were no longer
 indexed, which is the worst failure mode an eval can have: it still produces
@@ -52,6 +65,7 @@ Two findings worth keeping, both from running it rather than reading it:
 | `live_eval.py` | **Live** end-to-end runner: drives the running HTTP API (`/ask`, `/exercise`, `/quiz`) over `live_eval_cases.json` with an external LLM reviewer, writing each run under `eval/live_runs/`. A manual smoke tool, not run in CI. |
 | `dataset.jsonl` | The 50-case labeled set (`run_eval`, `benchmark`, `calibrate`, `ab_retrieval`). |
 | `live_eval_cases.json` | The 71-case endpoint set for `live_eval.py`. |
+| `corpus/` | The six benchmark chapters as PDFs — the material every case above is written against. `make ingest-bench` indexes them. |
 
 ## How it fits
 
@@ -95,11 +109,11 @@ p50/p95 (needs `LATENCY_ENABLED`).
 in the product but *unscoped* on the offline path, so a collection holding several
 accounts' courses will happily answer an out-of-scope question from someone else's
 documents — and the harness will score the missing refusal as a product failure.
-Pass the account that owns `uploads/bench/` (`--owner u4` locally) so the run
+Pass the account that owns `corpus/` (`--owner u4` locally) so the run
 measures the corpus the dataset was written against.
 
-Prerequisites: Qdrant up with the six chapters indexed, DB migrated. Real runs make
-paid API calls.
+Prerequisites: Qdrant up with the six chapters indexed (`make ingest-bench`), DB
+migrated. Real runs make paid API calls.
 
 ```bash
 # OpenAI (default provider)
